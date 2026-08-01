@@ -66,5 +66,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Esta aplicación requiere acceso a tu ubicación para mostrar tu posición en el mapa respecto a los clientes de Aguas del Valle en Monte Patria.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Esta aplicación requiere acceso a tu ubicación para mostrar tu posición en el mapa respecto a los clientes de Aguas del Valle en Monte Patria.</string>
 </dict>
 </plist>

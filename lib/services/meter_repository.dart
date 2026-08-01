@@ -173,6 +173,19 @@ class MeterRepository {
     await box.delete(id);
   }
 
+  /// Update an existing client's geographical location
+  Future<void> updateClientLocation(String id, double newLat, double newLng) async {
+    final box = await _getBox();
+    final client = box.get(id);
+    if (client != null) {
+      final updated = client.copyWith(
+        latitude: newLat,
+        longitude: newLng,
+      );
+      await box.put(id, updated);
+    }
+  }
+
   /// Reset all records for a new cycle
   Future<void> resetAllReadings() async {
     final box = await _getBox();

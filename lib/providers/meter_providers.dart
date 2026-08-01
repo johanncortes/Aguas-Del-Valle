@@ -76,6 +76,12 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     state = await _repository.getAllClients();
   }
 
+  /// Update client location (relocate pin)
+  Future<void> updateClientLocation(String clientId, double newLat, double newLng) async {
+    await _repository.updateClientLocation(clientId, newLat, newLng);
+    state = await _repository.getAllClients();
+  }
+
   /// Reset all readings for a new cycle
   Future<void> resetAll() async {
     await _repository.resetAllReadings();

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/client_meter_record.dart';
 import '../providers/meter_providers.dart';
@@ -25,6 +27,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   bool _isExporting = false;
   bool _isAddPinMode = false;
 
+  // Real-time geolocation
+  LatLng? _userLocation;
+  StreamSubscription<Position>? _positionStreamSubscription;
+
+  // Relocation mode state
+  bool _isRelocatingMode = false;
+  ClientMeterRecord? _relocatingClient;
+
   // Sol de las Praderas target coordinates
   static const _mapCenter = LatLng(-30.729639, -70.764389);
 
@@ -35,6 +45,59 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void initState() {
     super.initState();
     _loadData();
+    _initGeolocation();
+  }
+
+  @override
+  void dispose() {
+    _positionStreamSubscription?.cancel();
+    _mapController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _initGeolocation() async {
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) return;
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        return;
+      }
+
+      try {
+        final position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+          ),
+        );
+        if (mounted) {
+          setState(() {
+            _userLocation = LatLng(position.latitude, position.longitude);
+          });
+        }
+      } catch (_) {}
+
+      _positionStreamSubscription = Geolocator.getPositionStream(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: 5,
+        ),
+      ).listen((Position position) {
+        if (mounted) {
+          setState(() {
+            _userLocation = LatLng(position.latitude, position.longitude);
+          });
+        }
+      });
+    } catch (_) {}
   }
 
   Future<void> _loadData() async {
@@ -96,6 +159,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     child: _buildAddPinBanner(),
                   ),
 
+                // Relocate mode banner
+                if (_isRelocatingMode && _relocatingClient != null)
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 78,
+                    left: 16,
+                    right: 16,
+                    child: _buildRelocatingBanner(_relocatingClient!),
+                  ),
+
                 // Bottom progress panel
                 Positioned(
                   bottom: 0,
@@ -126,12 +198,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     ),
                   ),
                   const SizedBox(height: 10),
-                  // Re-center map button
+                  // Locate me (user GPS) button
+                  FloatingActionButton.small(
+                    heroTag: 'locate_me',
+                    onPressed: _locateMe,
+                    backgroundColor: AppTheme.surfaceCard.withValues(alpha: 0.9),
+                    child: const Icon(Icons.my_location, size: 20, color: Colors.blue),
+                  ),
+                  const SizedBox(height: 10),
+                  // Re-center on Sector Sol de las Praderas button
                   FloatingActionButton.small(
                     heroTag: 'center_map',
                     onPressed: _centerMap,
                     backgroundColor: AppTheme.surfaceCard.withValues(alpha: 0.9),
-                    child: const Icon(Icons.my_location, size: 20),
+                    child: const Icon(Icons.explore_outlined, size: 20),
                   ),
                   const SizedBox(height: 10),
                   // Export button
@@ -189,6 +269,53 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 color: AppTheme.warningAmber,
               ),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRelocatingBanner(ClientMeterRecord client) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.warningAmber.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppTheme.warningAmber.withValues(alpha: 0.5),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 8,
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.location_searching, size: 20, color: AppTheme.warningAmber),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Toca el mapa para la nueva ubicación de ${client.ownerName}',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.warningAmber,
+              ),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, color: AppTheme.warningAmber, size: 18),
+            onPressed: () {
+              setState(() {
+                _isRelocatingMode = false;
+                _relocatingClient = null;
+              });
+            },
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),
@@ -288,7 +415,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         initialZoom: 15.5,
         maxZoom: 19.0,
         minZoom: 12.0,
-        onTap: _isAddPinMode ? _onMapTappedForPin : null,
+        onTap: (_isAddPinMode || _isRelocatingMode) ? _onMapTappedForPin : null,
         onLongPress: _onMapLongPress,
       ),
       children: [
@@ -298,15 +425,117 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           maxZoom: 19,
           tileProvider: CachedTileProvider(),
         ),
+        if (_userLocation != null)
+          CircleLayer(
+            circles: [
+              CircleMarker(
+                point: _userLocation!,
+                radius: 24,
+                useRadiusInMeter: false,
+                color: Colors.blue.withValues(alpha: 0.2),
+                borderColor: Colors.blue.withValues(alpha: 0.6),
+                borderStrokeWidth: 1.5,
+              ),
+            ],
+          ),
         MarkerLayer(
           markers: [
             ...clients.map((client) => _buildMarker(client)),
             // Pending pin preview marker
             if (_pendingPinLocation != null) _buildPendingMarker(),
+            // User current location blue dot marker
+            if (_userLocation != null) _buildUserLocationMarker(),
           ],
         ),
       ],
     );
+  }
+
+  Marker _buildUserLocationMarker() {
+    return Marker(
+      point: _userLocation!,
+      width: 28,
+      height: 28,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.blue,
+          shape: BoxShape.circle,
+          border: Border.all(color: Colors.white, width: 3),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _locateMe() async {
+    if (_userLocation != null) {
+      _mapController.move(_userLocation!, 17.0);
+      return;
+    }
+
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Servicio de ubicación desactivado.')),
+          );
+        }
+        return;
+      }
+
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Permiso de ubicación denegado.')),
+            );
+          }
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Permiso de ubicación denegado permanentemente.'),
+            ),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      final latLng = LatLng(position.latitude, position.longitude);
+      if (mounted) {
+        setState(() {
+          _userLocation = latLng;
+        });
+        _mapController.move(latLng, 17.0);
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo obtener la ubicación GPS.'),
+          ),
+        );
+      }
+    }
   }
 
   Marker _buildPendingMarker() {
@@ -395,12 +624,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   void _onMarkerTapped(ClientMeterRecord client) {
-    // If in add-pin mode, ignore marker taps
-    if (_isAddPinMode) return;
+    // If in add-pin mode or relocation mode, ignore marker taps
+    if (_isAddPinMode || _isRelocatingMode) return;
     _showClientPreview(client);
   }
 
   void _onMapTappedForPin(TapPosition tapPosition, LatLng point) {
+    if (_isRelocatingMode && _relocatingClient != null) {
+      final client = _relocatingClient!;
+      ref.read(clientRecordsProvider.notifier).updateClientLocation(
+            client.id,
+            point.latitude,
+            point.longitude,
+          );
+      setState(() {
+        _isRelocatingMode = false;
+        _relocatingClient = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Ubicación de "${client.ownerName}" actualizada correctamente.',
+          ),
+        ),
+      );
+      return;
+    }
+
     if (!_isAddPinMode) return;
     setState(() {
       _pendingPinLocation = point;
@@ -409,8 +659,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   void _onMapLongPress(TapPosition tapPosition, LatLng point) {
-    // Long press always opens the add client modal, even outside add-pin mode
+    // Long press always opens the add client modal
     setState(() {
+      _isRelocatingMode = false;
+      _relocatingClient = null;
       _pendingPinLocation = point;
       _isAddPinMode = true;
     });
@@ -420,10 +672,76 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   void _toggleAddPinMode() {
     setState(() {
       _isAddPinMode = !_isAddPinMode;
+      if (_isAddPinMode) {
+        _isRelocatingMode = false;
+        _relocatingClient = null;
+      }
       if (!_isAddPinMode) {
         _pendingPinLocation = null;
       }
     });
+  }
+
+  void _startRelocationMode(ClientMeterRecord client) {
+    setState(() {
+      _isRelocatingMode = true;
+      _relocatingClient = client;
+      _isAddPinMode = false;
+      _pendingPinLocation = null;
+    });
+  }
+
+  void _confirmDeleteClient(ClientMeterRecord client) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.surfaceCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Eliminar Cliente',
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        content: Text(
+          '¿Seguro que deseas eliminar a ${client.ownerName} (N° ${client.clientNumber})?',
+          style: GoogleFonts.inter(
+            fontSize: 14,
+            color: AppTheme.textSecondary,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.inter(color: AppTheme.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context); // close dialog
+              Navigator.pop(context); // close bottom sheet
+              ref.read(clientRecordsProvider.notifier).deleteClient(client.id);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Cliente "${client.ownerName}" eliminado.'),
+                ),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.errorRed,
+            ),
+            child: Text(
+              'Eliminar',
+              style: GoogleFonts.inter(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showAddClientModal(LatLng location) {
@@ -555,8 +873,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ],
               ],
             ),
-            const SizedBox(height: 24),
-            // Action button
+            // Primary action button (Read/Edit)
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -583,6 +900,60 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
               ),
+            ),
+            const SizedBox(height: 12),
+            // Secondary action row: Reubicar & Eliminar
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _startRelocationMode(client);
+                    },
+                    icon: const Icon(Icons.location_on,
+                        size: 18, color: AppTheme.accentCyan),
+                    label: Text(
+                      'Reubicar',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.accentCyan,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                          color: AppTheme.accentCyan.withValues(alpha: 0.4)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _confirmDeleteClient(client),
+                    icon: const Icon(Icons.delete_outline,
+                        size: 18, color: AppTheme.errorRed),
+                    label: Text(
+                      'Eliminar',
+                      style: GoogleFonts.inter(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.errorRed,
+                      ),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: BorderSide(
+                          color: AppTheme.errorRed.withValues(alpha: 0.4)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -794,18 +1165,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     try {
       final exportService = ref.read(excelExportServiceProvider);
       final file = await exportService.generateExcel(clients);
-      await exportService.shareFile(file);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
+            duration: const Duration(seconds: 6),
             content: Row(
               children: [
                 const Icon(Icons.check_circle, color: AppTheme.visitedGreen),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Archivo Excel generado exitosamente',
-                    style: GoogleFonts.inter(),
+                    'Archivo guardado en: ${file.path}',
+                    style: GoogleFonts.inter(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ],
@@ -813,6 +1187,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         );
       }
+      await exportService.shareFile(file);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

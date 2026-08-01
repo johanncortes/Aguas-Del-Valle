@@ -118,5 +118,27 @@ void main() {
       expect(record.isVisited, true);
       expect(record.consumptionM3, 15);
     });
+
+    test('copyWith updates latitude and longitude for relocation', () {
+      final record = ClientMeterRecord(
+        id: 'sp-001',
+        clientNumber: '40225001',
+        ownerName: 'María Elena Cortés Rojas',
+        readingTwoMonthsAgo: 1245,
+        readingOneMonthAgo: 1268,
+        latitude: -30.7280,
+        longitude: -70.7660,
+      );
+
+      final relocated = record.copyWith(
+        latitude: -30.7305,
+        longitude: -70.7622,
+      );
+
+      expect(relocated.latitude, -30.7305);
+      expect(relocated.longitude, -70.7622);
+      expect(relocated.ownerName, 'María Elena Cortés Rojas'); // unchanged
+      expect(relocated.id, 'sp-001'); // unchanged
+    });
   });
 }
