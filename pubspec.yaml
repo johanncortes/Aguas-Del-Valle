@@ -1,0 +1,54 @@
+name: aguas_monte_patria
+description: "Water Meter Reader MVP for Aguas del Valle - Monte Patria"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+
+  # Mapping
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
+
+  # Local Storage
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # Excel Export
+  excel: ^4.0.6
+
+  # File System & Sharing
+  path_provider: ^2.1.5
+  share_plus: ^10.1.4
+
+  # UI & Fonts
+  intl: ^0.20.2
+  dio: ^5.11.0
+  dio_cache_interceptor: ^4.0.7
+  uuid: ^4.6.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
