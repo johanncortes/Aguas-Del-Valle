@@ -106,6 +106,25 @@ void main() {
     expect(records[1].sector, isNull);
   });
 
+  test('coordinates are optional but never half filled', () {
+    final records = service.parse(_xlsx([
+      _headers,
+      [1, 'Sin coordenadas', null, null, 10, 5],
+      [2, 'Exportado sin ubicación', '-', '-', 10, 5],
+    ]));
+    expect(records.map((r) => r.hasLocation), [false, false]);
+
+    final error = _parseError(_xlsx([
+      _headers,
+      [1, 'A', -30.7, null, 10, 5],
+      [2, 'B', null, -70.7, 10, 5],
+    ]));
+    expect(error.rowErrors, [
+      'Fila 2: falta la longitud',
+      'Fila 3: falta la latitud',
+    ]);
+  });
+
   test('reports missing columns by name', () {
     final error = _parseError(_xlsx([
       ['N° Cliente', 'Nombre', 'Latitud'],

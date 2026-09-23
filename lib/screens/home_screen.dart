@@ -163,6 +163,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   child: _buildHeaderBar(progress),
                 ),
 
+                // Clients waiting for their location to be fixed
+                if (!_isAddPinMode &&
+                    !_isRelocatingMode &&
+                    clients.any((c) => !c.hasLocation))
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 78,
+                    left: 16,
+                    right: 16,
+                    child: _buildUnlocatedBanner(
+                        clients.where((c) => !c.hasLocation).length),
+                  ),
+
                 // Add pin mode banner
                 if (_isAddPinMode)
                   Positioned(
@@ -266,6 +278,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildUnlocatedBanner(int count) {
+    return Material(
+      key: const Key('unlocatedBanner'),
+      color: AppTheme.background.withValues(alpha: 0.95),
+      borderRadius: BorderRadius.circular(12),
+      elevation: 2,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: _openClientList,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              const Icon(Icons.location_off_outlined,
+                  size: 20, color: AppTheme.warningAmber),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  count == 1
+                      ? '1 cliente sin ubicación en el mapa. '
+                          'Búsquelo en la lista para fijarla.'
+                      : '$count clientes sin ubicación en el mapa. '
+                          'Búsquelos en la lista para fijarla.',
+                  style: AppFonts.text(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -735,11 +785,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   /// Moves the map to show every client (an imported route may be in a
   /// different sector than the default center).
   void _fitMapToClients(List<ClientMeterRecord> clients) {
-    if (clients.isEmpty) return;
+    final located = clients.where((c) => c.hasLocation).toList();
+    if (located.isEmpty) return;
     _mapController.fitCamera(
       CameraFit.coordinates(
         coordinates: [
-          for (final c in clients) LatLng(c.latitude, c.longitude),
+          for (final c in located) LatLng(c.latitude!, c.longitude!),
         ],
         padding: const EdgeInsets.fromLTRB(40, 120, 40, 220),
         maxZoom: 17,
@@ -870,7 +921,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         MarkerLayer(
           markers: [
-            ...clients.map((client) => _buildMarker(client)),
+            // Clients without an official location have no pin; they are
+            // reached from the client list.
+            ...clients
+                .where((client) => client.hasLocation)
+                .map(_buildMarker),
             // Pending pin preview marker
             if (_pendingPinLocation != null) _buildPendingMarker(),
             // User current location blue dot marker
@@ -1006,7 +1061,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   Marker _buildMarker(ClientMeterRecord client) {
     final status = client.visitStatus;
     return Marker(
-      point: LatLng(client.latitude, client.longitude),
+      point: LatLng(client.latitude!, client.longitude!),
       width: 48,
       height: 56,
       child: GestureDetector(

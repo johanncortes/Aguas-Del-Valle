@@ -108,4 +108,22 @@ void main() {
       expect(r.sector, 'Angostura'); // master data survives the round trip
     }
   });
+
+  test('clients without location export "-" and import back without it',
+      () {
+    final unlocated = ClientMeterRecord(
+      id: 'seed-7',
+      clientNumber: '7',
+      ownerName: 'Reinaldo Bravo Alvarez',
+      readingTwoMonthsAgo: 0,
+      readingOneMonthAgo: 0,
+      sector: 'Sol de las Praderas',
+    );
+    final bytes = ExcelExportService().buildExcelBytes([unlocated]);
+    expect(_rows(bytes)[1].sublist(3, 5), ['-', '-']);
+
+    final imported = ExcelImportService().parse(bytes).single;
+    expect(imported.hasLocation, isFalse);
+    expect(imported.sector, 'Sol de las Praderas');
+  });
 }

@@ -8,8 +8,10 @@ class ClientMeterRecord {
   final int readingOneMonthAgo;
   int? currentReading;
   bool isVisited;
-  final double latitude;
-  final double longitude;
+  /// Official meter location. Null until it is fixed in the field (e.g.
+  /// clients from the preloaded list); such clients have no map pin.
+  final double? latitude;
+  final double? longitude;
   DateTime? updatedAt;
 
   /// Why the meter could not be read this cycle (see [NonReadingReason]).
@@ -38,8 +40,8 @@ class ClientMeterRecord {
     required this.readingOneMonthAgo,
     this.currentReading,
     this.isVisited = false,
-    required this.latitude,
-    required this.longitude,
+    this.latitude,
+    this.longitude,
     this.updatedAt,
     this.nonReadingReason,
     this.observations,
@@ -60,6 +62,9 @@ class ClientMeterRecord {
     if (currentReading == null) return false;
     return currentReading! < readingOneMonthAgo;
   }
+
+  /// Whether the client has an official location (and so a map pin).
+  bool get hasLocation => latitude != null && longitude != null;
 
   /// True when the reader visited the client but could not take a reading.
   bool get hasNonReading => nonReadingReason != null && currentReading == null;
@@ -188,8 +193,8 @@ class ClientMeterRecordAdapter extends TypeAdapter<ClientMeterRecord> {
       readingOneMonthAgo: fields[4] as int,
       currentReading: fields[5] as int?,
       isVisited: fields[6] as bool,
-      latitude: fields[7] as double,
-      longitude: fields[8] as double,
+      latitude: fields[7] as double?,
+      longitude: fields[8] as double?,
       updatedAt: fields[9] as DateTime?,
       // Fields 10+ were added later; records saved by older versions
       // don't contain them and read back as null.

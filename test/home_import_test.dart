@@ -48,7 +48,8 @@ class _FakeImportService extends ExcelImportService {
   }
 }
 
-ClientMeterRecord _client(String id, {int? reading}) => ClientMeterRecord(
+ClientMeterRecord _client(String id, {int? reading, bool located = true}) =>
+    ClientMeterRecord(
       id: id,
       clientNumber: id,
       ownerName: 'Cliente $id',
@@ -56,8 +57,8 @@ ClientMeterRecord _client(String id, {int? reading}) => ClientMeterRecord(
       readingOneMonthAgo: 0,
       currentReading: reading,
       isVisited: reading != null,
-      latitude: -30.73,
-      longitude: -70.76,
+      latitude: located ? -30.73 : null,
+      longitude: located ? -70.76 : null,
     );
 
 Future<_FakeImportService> _pumpHome(
@@ -199,4 +200,27 @@ void main() {
       await _unmount(tester);
     });
   }
+
+  testWidgets('clients without location get no pin and a banner',
+      (tester) async {
+    await _pumpHome(tester, clients: [
+      _client('a', located: false),
+      _client('b', located: false),
+    ]);
+
+    // Pending pins use the water drop icon; only the header logo remains
+    expect(find.byIcon(Icons.water_drop), findsOneWidget);
+    expect(find.text('2 clientes sin ubicación en el mapa. '
+        'Búsquelos en la lista para fijarla.'), findsOneWidget);
+    await _unmount(tester);
+  });
+
+  testWidgets('located clients keep their pin and there is no banner',
+      (tester) async {
+    await _pumpHome(tester, clients: [_client('a')]);
+
+    expect(find.byIcon(Icons.water_drop), findsNWidgets(2)); // logo + pin
+    expect(find.byKey(const Key('unlocatedBanner')), findsNothing);
+    await _unmount(tester);
+  });
 }

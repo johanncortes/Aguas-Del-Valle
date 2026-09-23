@@ -196,11 +196,19 @@ class ExcelImportService {
 
       if (clientNumber.isEmpty) rowErrors.add('falta el N° de cliente');
       if (ownerName.isEmpty) rowErrors.add('falta el nombre');
-      if (latitude == null || latitude < -90 || latitude > 90) {
-        rowErrors.add('latitud inválida');
-      }
-      if (longitude == null || longitude < -180 || longitude > 180) {
-        rowErrors.add('longitud inválida');
+      // Coordinates are optional (both empty or "-": the location is
+      // fixed later in the field), but never half filled or invalid.
+      final noLatitude = _isBlank(cell(_Column.latitude));
+      final noLongitude = _isBlank(cell(_Column.longitude));
+      if (noLatitude != noLongitude) {
+        rowErrors.add(noLatitude ? 'falta la latitud' : 'falta la longitud');
+      } else if (!noLatitude) {
+        if (latitude == null || latitude < -90 || latitude > 90) {
+          rowErrors.add('latitud inválida');
+        }
+        if (longitude == null || longitude < -180 || longitude > 180) {
+          rowErrors.add('longitud inválida');
+        }
       }
       if (oneMonth == null) rowErrors.add('lectura mes anterior inválida');
       if (twoMonths == null) rowErrors.add('lectura 2 meses atrás inválida');
@@ -235,8 +243,8 @@ class ExcelImportService {
         ownerName: ownerName,
         readingTwoMonthsAgo: twoMonths!,
         readingOneMonthAgo: oneMonth!,
-        latitude: latitude!,
-        longitude: longitude!,
+        latitude: latitude,
+        longitude: longitude,
         sector: _nonEmpty(_cellText(
             sectorColumn != null && sectorColumn < row.length
                 ? row[sectorColumn]
@@ -275,6 +283,12 @@ class ExcelImportService {
   }
 
   static String? _nonEmpty(String text) => text.isEmpty ? null : text;
+
+  /// Empty cell or the "-" the export writes for missing values.
+  static bool _isBlank(Data? data) {
+    final text = _cellText(data);
+    return text.isEmpty || text == '-';
+  }
 
   /// Accepts numeric cells and text cells, including Chilean decimal
   /// commas ("-30,7296").

@@ -34,6 +34,7 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
 
   late final PhotoService _photoService;
   bool _isTakingPhoto = false;
+  bool _isFixingLocation = false;
 
   /// Evidence photo shown on screen (saved with the visit).
   String? _photoPath;
@@ -145,6 +146,12 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
               children: [
                 // Client info card
                 _buildClientInfoCard(client),
+
+                // Clients without an official location have no map pin
+                if (!client.hasLocation) ...[
+                  const SizedBox(height: 12),
+                  _buildFixLocationCard(client),
+                ],
                 const SizedBox(height: 20),
 
                 // Previous readings
@@ -182,6 +189,94 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildFixLocationCard(ClientMeterRecord client) {
+    return Container(
+      key: const Key('fixLocationCard'),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.warningAmber.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.warningAmber, width: 1.5),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.location_off_outlined,
+                  color: AppTheme.warningAmber),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Este cliente aún no tiene ubicación en el mapa. Párese '
+                  'junto al medidor y fíjela con el GPS.',
+                  style: AppFonts.text(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: _isFixingLocation ? null : () => _fixLocation(client),
+            icon: _isFixingLocation
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.my_location),
+            label: Text(
+              _isFixingLocation
+                  ? 'Obteniendo ubicación...'
+                  : 'Fijar Ubicación en el Mapa (GPS)',
+              style: AppFonts.text(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.warningAmber,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _fixLocation(ClientMeterRecord client) async {
+    setState(() => _isFixingLocation = true);
+    try {
+      final position = await ref
+          .read(clientRecordsProvider.notifier)
+          .fixLocationFromGps(client.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            position != null
+                ? 'Ubicación fijada: ${position.latitude.toStringAsFixed(5)}, '
+                    '${position.longitude.toStringAsFixed(5)}'
+                : 'No se pudo obtener la ubicación. Active el GPS y el '
+                    'permiso de ubicación, e intente de nuevo.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al fijar la ubicación: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isFixingLocation = false);
+    }
   }
 
   Widget _buildClientInfoCard(ClientMeterRecord client) {
