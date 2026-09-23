@@ -63,3 +63,13 @@ se conserva en el teléfono).
 ## Requisitos
 
 - Flutter 3.44 o superior (lo exige `image_picker`).
+
+## Clientes precargados
+
+En la primera ejecución (base de datos vacía) la app carga los 185 clientes
+oficiales de `lib/data/initial_clients.dart` con su N° de cliente, nombre y
+sector. Esa lista no trae coordenadas ni lecturas anteriores: las lecturas
+parten en 0 y los pines se ubican en una grilla por sector alrededor del
+mapa, marcados con "Ubicación por confirmar". En la primera visita use
+**Reubicar** para dejar cada pin en su lugar real, o importe una ruta Excel
+con Latitud/Longitud reales (reemplaza la lista precargada).

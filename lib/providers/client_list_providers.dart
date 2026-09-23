@@ -10,7 +10,7 @@ final clientSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '')
 final clientFilterStatusProvider =
     StateProvider.autoDispose<VisitStatus?>((ref) => null);
 
-/// Clients matching the search query (name or client number) and the
+/// Clients matching the search query (name, client number or sector) and the
 /// status filter, sorted by owner name.
 final filteredClientsProvider =
     Provider.autoDispose<List<ClientMeterRecord>>((ref) {
@@ -22,7 +22,8 @@ final filteredClientsProvider =
     if (status != null && client.visitStatus != status) return false;
     if (query.isEmpty) return true;
     return normalizeForSearch(client.ownerName).contains(query) ||
-        normalizeForSearch(client.clientNumber).contains(query);
+        normalizeForSearch(client.clientNumber).contains(query) ||
+        normalizeForSearch(client.sector ?? '').contains(query);
   }).toList()
     ..sort((a, b) => normalizeForSearch(a.ownerName)
         .compareTo(normalizeForSearch(b.ownerName)));

@@ -95,6 +95,17 @@ void main() {
     expect(records[0].readingTwoMonthsAgo, 0);
   });
 
+  test('reads an optional Sector column', () {
+    final records = service.parse(_xlsx([
+      [..._headers, 'Sector'],
+      [1, 'A', -30.7, -70.7, 10, 5, 'Varillar'],
+      [2, 'B', -30.7, -70.7, 10, 5, null],
+    ]));
+
+    expect(records[0].sector, 'Varillar');
+    expect(records[1].sector, isNull);
+  });
+
   test('reports missing columns by name', () {
     final error = _parseError(_xlsx([
       ['N° Cliente', 'Nombre', 'Latitud'],

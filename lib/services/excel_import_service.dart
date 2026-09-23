@@ -42,6 +42,9 @@ enum _Column {
 /// month on import (same rule as closing the month in the app).
 const _currentReadingAliases = ['lectura actual'];
 
+/// Optional "Sector" column (locality), kept as master data.
+const _sectorAliases = ['sector', 'localidad'];
+
 /// Reads the monthly route (list of clients) from an .xlsx file.
 class ExcelImportService {
   static const _uuid = Uuid();
@@ -91,6 +94,7 @@ class ExcelImportService {
           header.rowIndex,
           header.columns,
           _findColumn(rows[header.rowIndex], _currentReadingAliases),
+          _findColumn(rows[header.rowIndex], _sectorAliases),
         );
       }
     }
@@ -152,6 +156,7 @@ class ExcelImportService {
     int headerRow,
     Map<_Column, int> columns,
     int? currentReadingColumn,
+    int? sectorColumn,
   ) {
     final records = <ClientMeterRecord>[];
     final errors = <String>[];
@@ -232,6 +237,10 @@ class ExcelImportService {
         readingOneMonthAgo: oneMonth!,
         latitude: latitude!,
         longitude: longitude!,
+        sector: _nonEmpty(_cellText(
+            sectorColumn != null && sectorColumn < row.length
+                ? row[sectorColumn]
+                : null)),
       ));
     }
 
@@ -264,6 +273,8 @@ class ExcelImportService {
       _ => value.toString().trim(),
     };
   }
+
+  static String? _nonEmpty(String text) => text.isEmpty ? null : text;
 
   /// Accepts numeric cells and text cells, including Chilean decimal
   /// commas ("-30,7296").

@@ -116,11 +116,51 @@ void main() {
   });
 
   group('loading and importing', () {
-    test('starts empty when nothing was imported (no seed data)', () async {
+    test('first launch loads the 185 official clients', () async {
       await Hive.deleteBoxFromDisk('meter_records');
       final fresh = ClientRecordsNotifier(MeterRepository());
       await fresh.loadClients();
-      expect(fresh.state, isEmpty);
+
+      final clients = fresh.state;
+      expect(clients, hasLength(185));
+      final byNumber = {for (final c in clients) c.clientNumber: c};
+      expect(byNumber.keys.toSet(),
+          {for (var i = 1; i <= 185; i++) '$i'}); // unique N° 1..185
+      expect(byNumber['1']!.ownerName, 'Eduardo Osandon Pasten');
+      expect(byNumber['1']!.sector, 'Sol de las Praderas');
+      expect(byNumber['76']!.ownerName,
+          'Sociedad Carrizal ( Puente Carrizal )');
+      expect(byNumber['76']!.sector, 'Angostura');
+      expect(byNumber['185']!.sector, 'Punta Blanca');
+
+      final sectorCounts = <String, int>{};
+      for (final c in clients) {
+        sectorCounts[c.sector!] = (sectorCounts[c.sector!] ?? 0) + 1;
+      }
+      expect(sectorCounts, {
+        'Sol de las Praderas': 75,
+        'Angostura': 23,
+        'Barrancones': 19,
+        'Las Condes': 24,
+        'Varillar': 18,
+        'Punta Blanca': 26,
+      });
+
+      for (final c in clients) {
+        expect(c.isVisited, isFalse);
+        expect(c.readingOneMonthAgo, 0);
+        expect(c.observations, MeterRepository.seedLocationNote);
+      }
+      // Every pin has its own spot, so none hides another on the map
+      final spots = {for (final c in clients) (c.latitude, c.longitude)};
+      expect(spots, hasLength(185));
+    });
+
+    test('does not seed over existing data', () async {
+      // setUp already imported 3 clients
+      final reloaded = ClientRecordsNotifier(MeterRepository());
+      await reloaded.loadClients();
+      expect(reloaded.state, hasLength(3));
     });
 
     test('importClients replaces the whole route', () async {

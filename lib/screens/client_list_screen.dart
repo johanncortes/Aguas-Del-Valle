@@ -164,7 +164,11 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen> {
           ),
         ),
         subtitle: Text(
-          'N° ${client.clientNumber} • $detail',
+          [
+            'N° ${client.clientNumber}',
+            if (client.sector != null) client.sector!,
+            detail,
+          ].join(' • '),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: AppFonts.text(fontSize: 12, color: AppTheme.textSecondary),
