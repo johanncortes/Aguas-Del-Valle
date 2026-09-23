@@ -38,16 +38,32 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
     );
     _animController.forward();
 
-    _readingController.addListener(() {
-      final text = _readingController.text;
-      setState(() {
-        _liveReading = text.isEmpty ? null : int.tryParse(text);
-      });
-    });
+    // Pre-fill once with the existing reading (edit mode). Done before the
+    // listener is attached so it never triggers setState during build, and
+    // never runs again, so the user can clear the field to type a new value.
+    final client = ref
+        .read(clientRecordsProvider)
+        .where((c) => c.id == widget.clientId)
+        .firstOrNull;
+    final existingReading = client?.currentReading;
+    if (existingReading != null) {
+      _readingController.text = existingReading.toString();
+      _liveReading = existingReading;
+    }
+
+    _readingController.addListener(_onReadingChanged);
+  }
+
+  void _onReadingChanged() {
+    final text = _readingController.text;
+    final parsed = text.isEmpty ? null : int.tryParse(text);
+    if (parsed == _liveReading) return;
+    setState(() => _liveReading = parsed);
   }
 
   @override
   void dispose() {
+    _readingController.removeListener(_onReadingChanged);
     _readingController.dispose();
     _readingFocusNode.dispose();
     _animController.dispose();
@@ -64,14 +80,6 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
         appBar: AppBar(title: const Text('Error')),
         body: const Center(child: Text('Cliente no encontrado')),
       );
-    }
-
-    // Pre-fill if already visited
-    if (client.isVisited &&
-        client.currentReading != null &&
-        _readingController.text.isEmpty) {
-      _readingController.text = client.currentReading.toString();
-      _liveReading = client.currentReading;
     }
 
     return Scaffold(

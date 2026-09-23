@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:ui' as ui;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -399,6 +400,199 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 color: progress.percent == 100
                     ? AppTheme.visitedGreen
                     : AppTheme.accentCyan,
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          _buildHeaderMenu(progress),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderMenu(({int total, int visited, double percent}) progress) {
+    return PopupMenuButton<_HeaderMenuAction>(
+      tooltip: 'Opciones',
+      icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary),
+      color: AppTheme.surfaceCard,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      onSelected: (action) {
+        switch (action) {
+          case _HeaderMenuAction.closeCycle:
+            _confirmCloseCycle(progress);
+          case _HeaderMenuAction.reseed:
+            _confirmReseed();
+        }
+      },
+      itemBuilder: (context) => [
+        PopupMenuItem(
+          value: _HeaderMenuAction.closeCycle,
+          child: Row(
+            children: [
+              const Icon(Icons.event_repeat,
+                  size: 20, color: AppTheme.accentCyan),
+              const SizedBox(width: 12),
+              Text(
+                'Cerrar mes e iniciar nuevo ciclo',
+                style: GoogleFonts.inter(color: AppTheme.textPrimary),
+              ),
+            ],
+          ),
+        ),
+        // Wipes all data: only available in debug builds
+        if (kDebugMode)
+          PopupMenuItem(
+            value: _HeaderMenuAction.reseed,
+            child: Row(
+              children: [
+                const Icon(Icons.restart_alt,
+                    size: 20, color: AppTheme.errorRed),
+                const SizedBox(width: 12),
+                Text(
+                  'Reiniciar datos de prueba',
+                  style: GoogleFonts.inter(color: AppTheme.textPrimary),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+
+  Future<void> _confirmCloseCycle(
+      ({int total, int visited, double percent}) progress) async {
+    final pending = progress.total - progress.visited;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surfaceCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Cerrar mes',
+          style: GoogleFonts.inter(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Las lecturas actuales pasarán a ser la "lectura anterior" y '
+              'todos los clientes quedarán como pendientes para el nuevo ciclo.',
+              style: GoogleFonts.inter(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            if (pending > 0) ...[
+              const SizedBox(height: 12),
+              _buildDialogWarning(
+                'Quedan $pending cliente(s) sin lectura. Mantendrán su '
+                'última lectura conocida.',
+              ),
+            ],
+            const SizedBox(height: 12),
+            _buildDialogWarning(
+              'Exporta el Excel antes de continuar: esta acción no se '
+              'puede deshacer.',
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              'Cancelar',
+              style: GoogleFonts.inter(color: AppTheme.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.warningAmber,
+            ),
+            child: Text(
+              'Cerrar mes',
+              style: GoogleFonts.inter(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    try {
+      await ref.read(clientRecordsProvider.notifier).resetAll();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nuevo ciclo iniciado.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al cerrar el mes: $e')),
+      );
+    }
+  }
+
+  Future<void> _confirmReseed() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surfaceCard,
+        title: const Text('Reiniciar datos de prueba'),
+        content: const Text(
+          'Se borrarán todos los clientes y lecturas y se cargarán los '
+          'datos de ejemplo.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancelar'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.errorRed,
+            ),
+            child: const Text('Borrar todo'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+    await ref.read(clientRecordsProvider.notifier).resetAndReseed();
+  }
+
+  Widget _buildDialogWarning(String text) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.warningAmber.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: AppTheme.warningAmber.withValues(alpha: 0.4),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.warning_amber_rounded,
+              size: 18, color: AppTheme.warningAmber),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.warningAmber,
               ),
             ),
           ),
@@ -1214,6 +1408,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 }
+
+enum _HeaderMenuAction { closeCycle, reseed }
 
 /// Custom painter for the triangular pin tail
 class _PinTailPainter extends CustomPainter {
