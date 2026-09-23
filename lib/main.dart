@@ -17,12 +17,13 @@ void main() async {
   // Initialize offline tile cache provider
   await CachedTileProvider.initialize();
 
-  // Set system UI overlay style for immersive dark look
+  // Dark system bar icons over the light theme
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: AppTheme.surfaceDark,
-    systemNavigationBarIconBrightness: Brightness.light,
+    statusBarIconBrightness: Brightness.dark,
+    statusBarBrightness: Brightness.light, // iOS
+    systemNavigationBarColor: AppTheme.background,
+    systemNavigationBarIconBrightness: Brightness.dark,
   ));
 
   // Lock to portrait for field use
@@ -41,7 +42,9 @@ class AguasMontePatriaApp extends StatelessWidget {
     return MaterialApp(
       title: 'Aguas Monte Patria',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.darkTheme,
+      // Light only: dark themes are unreadable in direct sunlight
+      theme: AppTheme.lightTheme,
+      themeMode: ThemeMode.light,
       home: const HomeScreen(),
     );
   }

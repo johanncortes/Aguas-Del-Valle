@@ -2,6 +2,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/client_meter_record.dart';
 import '../services/meter_repository.dart';
 import '../services/excel_export_service.dart';
+import '../services/excel_import_service.dart';
+import '../services/location_service.dart';
+import '../services/photo_service.dart';
 
 /// Repository singleton provider
 final meterRepositoryProvider = Provider<MeterRepository>((ref) {
@@ -22,26 +25,51 @@ class DuplicateClientNumberException implements Exception {
   String toString() => 'Ya existe un cliente con el N° $clientNumber';
 }
 
+/// Excel import service provider (overridable in tests)
+final excelImportServiceProvider = Provider<ExcelImportService>((ref) {
+  return ExcelImportService();
+});
+
+/// Device location for the GPS audit of visits (overridable in tests)
+final locationServiceProvider = Provider<LocationService>((ref) {
+  return const LocationService();
+});
+
+/// Camera evidence photos (overridable in tests)
+final photoServiceProvider = Provider<PhotoService>((ref) {
+  return PhotoService();
+});
+
 /// StateNotifier for managing client records
 class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
   final MeterRepository _repository;
+  final LocationService _locationService;
 
-  ClientRecordsNotifier(this._repository) : super([]);
+  ClientRecordsNotifier(
+    this._repository, [
+    this._locationService = const LocationService(),
+  ]) : super([]);
 
-  /// Load all clients from the database
+  /// Load all clients from the database. Starts empty until a route is
+  /// imported or clients are added from the map.
   Future<void> loadClients() async {
-    await _repository.seedIfEmpty();
     state = await _repository.getAllClients();
   }
 
   /// Record the result of a visit: either a [reading] or a
   /// [nonReadingReason] (exactly one of them), plus optional [observations].
   /// Saving one clears the other, so a record never holds both.
-  Future<void> saveReading(
+  ///
+  /// Also stores where the device was (GPS audit). Without location the
+  /// visit is still saved, with null coordinates: the reader's work is
+  /// never blocked by GPS. [photoPath] is the optional evidence photo.
+  /// Returns the saved record.
+  Future<ClientMeterRecord?> saveReading(
     String clientId, {
     int? reading,
     String? nonReadingReason,
     String? observations,
+    String? photoPath,
   }) async {
     if ((reading == null) == (nonReadingReason == null)) {
       throw ArgumentError(
@@ -49,8 +77,9 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     }
 
     final client = await _repository.getClient(clientId);
-    if (client == null) return;
+    if (client == null) return null;
 
+    final position = await _locationService.currentPosition();
     final trimmedObservations = observations?.trim();
     final updated = ClientMeterRecord(
       id: client.id,
@@ -67,10 +96,14 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
       observations: (trimmedObservations == null || trimmedObservations.isEmpty)
           ? null
           : trimmedObservations,
+      readingLatitude: position?.latitude,
+      readingLongitude: position?.longitude,
+      photoPath: photoPath,
     );
 
     await _repository.saveClient(updated);
     state = await _repository.getAllClients();
+    return updated;
   }
 
   /// Whether [clientNumber] is already used by a client other than
@@ -89,7 +122,6 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     required double longitude,
     int readingTwoMonthsAgo = 0,
     int readingOneMonthAgo = 0,
-    int? currentReading,
   }) async {
     if (isClientNumberTaken(clientNumber)) {
       throw DuplicateClientNumberException(clientNumber.trim());
@@ -101,7 +133,6 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
       longitude: longitude,
       readingTwoMonthsAgo: readingTwoMonthsAgo,
       readingOneMonthAgo: readingOneMonthAgo,
-      currentReading: currentReading,
     );
     state = await _repository.getAllClients();
     return record;
@@ -125,10 +156,12 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     state = await _repository.getAllClients();
   }
 
-  /// Clear and reseed (for dev / location change)
-  Future<void> resetAndReseed() async {
-    await _repository.resetAndReseed();
+  /// Replace the whole route with imported [records]; returns how many
+  /// clients were imported.
+  Future<int> importClients(List<ClientMeterRecord> records) async {
+    await _repository.replaceAllClients(records);
     state = await _repository.getAllClients();
+    return records.length;
   }
 }
 
@@ -136,14 +169,33 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
 final clientRecordsProvider =
     StateNotifierProvider<ClientRecordsNotifier, List<ClientMeterRecord>>((ref) {
   final repository = ref.watch(meterRepositoryProvider);
-  return ClientRecordsNotifier(repository);
+  return ClientRecordsNotifier(repository, ref.watch(locationServiceProvider));
+});
+
+/// Route progress for the current cycle. [visited] = [read] + [noReading].
+typedef RouteProgress = ({
+  int total,
+  int visited,
+  int read,
+  int noReading,
+  double percent,
 });
 
 /// Derived provider: progress stats
-final routeProgressProvider = Provider<({int total, int visited, double percent})>((ref) {
+final routeProgressProvider = Provider<RouteProgress>((ref) {
   final records = ref.watch(clientRecordsProvider);
   final total = records.length;
-  final visited = records.where((r) => r.isVisited).length;
+  final read =
+      records.where((r) => r.visitStatus == VisitStatus.read).length;
+  final noReading =
+      records.where((r) => r.visitStatus == VisitStatus.noReading).length;
+  final visited = read + noReading;
   final percent = total > 0 ? (visited / total) * 100 : 0.0;
-  return (total: total, visited: visited, percent: percent);
+  return (
+    total: total,
+    visited: visited,
+    read: read,
+    noReading: noReading,
+    percent: percent,
+  );
 });

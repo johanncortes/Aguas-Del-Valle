@@ -5,17 +5,42 @@ import 'package:hive/hive.dart';
 import 'package:aguas_monte_patria/models/client_meter_record.dart';
 import 'package:aguas_monte_patria/providers/meter_providers.dart';
 import 'package:aguas_monte_patria/services/meter_repository.dart';
+import 'package:aguas_monte_patria/services/location_service.dart';
+
+class _FakeLocationService extends LocationService {
+  _FakeLocationService(this.position);
+  DevicePosition? position;
+
+  @override
+  Future<DevicePosition?> currentPosition() async => position;
+}
+
+ClientMeterRecord _client(String id, String number) => ClientMeterRecord(
+      id: id,
+      clientNumber: number,
+      ownerName: 'Cliente $id',
+      readingTwoMonthsAgo: 1245,
+      readingOneMonthAgo: 1268,
+      latitude: -30.728,
+      longitude: -70.766,
+    );
 
 void main() {
   late Directory dir;
   late ClientRecordsNotifier notifier;
+  late _FakeLocationService location;
 
   setUp(() async {
     dir = await Directory.systemTemp.createTemp('hive_notifier_test');
     Hive.init(dir.path);
     Hive.registerAdapter(ClientMeterRecordAdapter(), override: true);
-    notifier = ClientRecordsNotifier(MeterRepository());
-    await notifier.loadClients(); // seeds sp-001 .. sp-010
+    location = _FakeLocationService((latitude: -30.7296, longitude: -70.7644));
+    notifier = ClientRecordsNotifier(MeterRepository(), location);
+    await notifier.importClients([
+      _client('sp-001', '40225001'),
+      _client('sp-002', '40225002'),
+      _client('sp-003', '40225003'),
+    ]);
   });
 
   tearDown(() async {
@@ -86,7 +111,77 @@ void main() {
         ),
         throwsA(isA<DuplicateClientNumberException>()),
       );
-      expect(notifier.state, hasLength(10));
+      expect(notifier.state, hasLength(3));
+    });
+  });
+
+  group('loading and importing', () {
+    test('starts empty when nothing was imported (no seed data)', () async {
+      await Hive.deleteBoxFromDisk('meter_records');
+      final fresh = ClientRecordsNotifier(MeterRepository());
+      await fresh.loadClients();
+      expect(fresh.state, isEmpty);
+    });
+
+    test('importClients replaces the whole route', () async {
+      await notifier.saveReading('sp-001', reading: 1300);
+
+      final count = await notifier.importClients([
+        _client('imp-1', '50000001'),
+        _client('imp-2', '50000002'),
+      ]);
+
+      expect(count, 2);
+      expect(notifier.state.map((c) => c.id), unorderedEquals(['imp-1', 'imp-2']));
+
+      // Persisted: a new notifier reading the box sees only the new route
+      final reloaded = ClientRecordsNotifier(MeterRepository());
+      await reloaded.loadClients();
+      expect(reloaded.state.map((c) => c.clientNumber),
+          unorderedEquals(['50000001', '50000002']));
+    });
+  });
+
+  group('GPS audit', () {
+    test('stores where the device was when saving', () async {
+      final saved = await notifier.saveReading('sp-001', reading: 1300);
+
+      expect(saved?.readingLatitude, -30.7296);
+      expect(saved?.readingLongitude, -70.7644);
+      expect(record('sp-001').readingLatitude, -30.7296);
+    });
+
+    test('saves anyway without location (never blocks the reader)',
+        () async {
+      location.position = null;
+
+      final saved = await notifier.saveReading('sp-001',
+          nonReadingReason: 'Casa cerrada');
+
+      expect(saved?.isVisited, isTrue);
+      expect(record('sp-001').nonReadingReason, 'Casa cerrada');
+      expect(record('sp-001').readingLatitude, isNull);
+      expect(record('sp-001').readingLongitude, isNull);
+    });
+
+    test('a new save without location clears the previous position',
+        () async {
+      await notifier.saveReading('sp-001', reading: 1300);
+      location.position = null;
+      await notifier.saveReading('sp-001', reading: 1301);
+
+      expect(record('sp-001').readingLatitude, isNull);
+    });
+  });
+
+  group('evidence photo', () {
+    test('saves the photo path and replaces it on a later save', () async {
+      await notifier.saveReading('sp-001',
+          reading: 1300, photoPath: '/docs/evidence_photos/a.jpg');
+      expect(record('sp-001').photoPath, '/docs/evidence_photos/a.jpg');
+
+      await notifier.saveReading('sp-001', reading: 1300);
+      expect(record('sp-001').photoPath, isNull);
     });
   });
 }

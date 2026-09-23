@@ -23,7 +23,6 @@ class _FakeClientRecordsNotifier extends ClientRecordsNotifier {
     required double longitude,
     int readingTwoMonthsAgo = 0,
     int readingOneMonthAgo = 0,
-    int? currentReading,
   }) async {
     created.add((
       clientNumber: clientNumber,
@@ -135,5 +134,10 @@ void main() {
     expect(notifier.created.single.twoMonths, 150);
     expect(notifier.created.single.oneMonth, 150);
     expect(find.byType(AddClientModal), findsNothing);
+  });
+
+  testWidgets('has no current reading field', (tester) async {
+    await _openModal(tester);
+    expect(find.textContaining('Lectura Actual'), findsNothing);
   });
 }
