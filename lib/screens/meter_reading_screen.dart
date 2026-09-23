@@ -20,10 +20,14 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
   final _formKey = GlobalKey<FormState>();
   final _readingController = TextEditingController();
   final _readingFocusNode = FocusNode();
+  final _observationsController = TextEditingController();
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
   bool _isSaving = false;
   int? _liveReading;
+
+  /// When set, the meter could not be read and the reading input is hidden.
+  NonReadingReason? _nonReadingReason;
 
   @override
   void initState() {
@@ -38,18 +42,37 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
     );
     _animController.forward();
 
-    _readingController.addListener(() {
-      final text = _readingController.text;
-      setState(() {
-        _liveReading = text.isEmpty ? null : int.tryParse(text);
-      });
-    });
+    // Pre-fill once with the existing reading (edit mode). Done before the
+    // listener is attached so it never triggers setState during build, and
+    // never runs again, so the user can clear the field to type a new value.
+    final client = ref
+        .read(clientRecordsProvider)
+        .where((c) => c.id == widget.clientId)
+        .firstOrNull;
+    final existingReading = client?.currentReading;
+    if (existingReading != null) {
+      _readingController.text = existingReading.toString();
+      _liveReading = existingReading;
+    }
+    _nonReadingReason = NonReadingReason.fromLabel(client?.nonReadingReason);
+    _observationsController.text = client?.observations ?? '';
+
+    _readingController.addListener(_onReadingChanged);
+  }
+
+  void _onReadingChanged() {
+    final text = _readingController.text;
+    final parsed = text.isEmpty ? null : int.tryParse(text);
+    if (parsed == _liveReading) return;
+    setState(() => _liveReading = parsed);
   }
 
   @override
   void dispose() {
+    _readingController.removeListener(_onReadingChanged);
     _readingController.dispose();
     _readingFocusNode.dispose();
+    _observationsController.dispose();
     _animController.dispose();
     super.dispose();
   }
@@ -64,14 +87,6 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
         appBar: AppBar(title: const Text('Error')),
         body: const Center(child: Text('Cliente no encontrado')),
       );
-    }
-
-    // Pre-fill if already visited
-    if (client.isVisited &&
-        client.currentReading != null &&
-        _readingController.text.isEmpty) {
-      _readingController.text = client.currentReading.toString();
-      _liveReading = client.currentReading;
     }
 
     return Scaffold(
@@ -111,12 +126,22 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
                 _buildPreviousReadingsCard(client),
                 const SizedBox(height: 20),
 
-                // Current reading input
-                _buildCurrentReadingInput(client),
+                // Reading taken or reason why it could not be taken
+                _buildNonReadingReasonSelector(),
                 const SizedBox(height: 20),
 
-                // Consumption summary
-                _buildConsumptionSummary(client),
+                if (_nonReadingReason == null) ...[
+                  // Current reading input
+                  _buildCurrentReadingInput(client),
+                  const SizedBox(height: 20),
+
+                  // Consumption summary
+                  _buildConsumptionSummary(client),
+                  const SizedBox(height: 20),
+                ],
+
+                // Free-text notes
+                _buildObservationsInput(),
                 const SizedBox(height: 32),
 
                 // Save button
@@ -369,6 +394,96 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
     );
   }
 
+  Widget _buildNonReadingReasonSelector() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _nonReadingReason != null
+              ? AppTheme.warningAmber.withValues(alpha: 0.5)
+              : AppTheme.surfaceCardLight.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.report_gmailerrorred,
+                  size: 20, color: AppTheme.textSecondary),
+              const SizedBox(width: 8),
+              Text(
+                'Resultado de la visita',
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<NonReadingReason?>(
+            key: const Key('nonReadingReasonDropdown'),
+            initialValue: _nonReadingReason,
+            isExpanded: true,
+            dropdownColor: AppTheme.surfaceCard,
+            style: GoogleFonts.inter(fontSize: 15, color: AppTheme.textPrimary),
+            items: [
+              DropdownMenuItem<NonReadingReason?>(
+                value: null,
+                child: Text(
+                  'Se tomó la lectura',
+                  style: GoogleFonts.inter(color: AppTheme.textPrimary),
+                ),
+              ),
+              for (final reason in NonReadingReason.values)
+                DropdownMenuItem<NonReadingReason?>(
+                  value: reason,
+                  child: Text(
+                    'No se pudo leer: ${reason.label}',
+                    style: GoogleFonts.inter(color: AppTheme.textPrimary),
+                  ),
+                ),
+            ],
+            onChanged: (reason) {
+              setState(() => _nonReadingReason = reason);
+              // Re-validate observations, which are required for "Otro"
+              _formKey.currentState?.validate();
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildObservationsInput() {
+    return TextFormField(
+      key: const Key('observationsField'),
+      controller: _observationsController,
+      maxLines: 3,
+      maxLength: 250,
+      textCapitalization: TextCapitalization.sentences,
+      style: GoogleFonts.inter(fontSize: 15, color: AppTheme.textPrimary),
+      decoration: InputDecoration(
+        labelText: _nonReadingReason == NonReadingReason.other
+            ? 'Observaciones (obligatorio)'
+            : 'Observaciones (opcional)',
+        alignLabelWithHint: true,
+        prefixIcon: const Icon(Icons.notes, color: AppTheme.textSecondary),
+      ),
+      validator: (value) {
+        if (_nonReadingReason == NonReadingReason.other &&
+            (value == null || value.trim().isEmpty)) {
+          return 'Describa el motivo en observaciones';
+        }
+        return null;
+      },
+    );
+  }
+
   Widget _buildCurrentReadingInput(ClientMeterRecord client) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -618,14 +733,24 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
   Future<void> _saveReading(ClientMeterRecord client) async {
     if (!_formKey.currentState!.validate()) return;
 
-    final reading = int.parse(_readingController.text);
+    final reason = _nonReadingReason;
+    final reading = reason == null ? int.parse(_readingController.text) : null;
+
+    if (reading != null && !await _confirmUnusualConsumption(client, reading)) {
+      _readingFocusNode.requestFocus();
+      return;
+    }
+    if (!mounted) return;
 
     setState(() => _isSaving = true);
 
     try {
-      await ref
-          .read(clientRecordsProvider.notifier)
-          .saveReading(client.id, reading);
+      await ref.read(clientRecordsProvider.notifier).saveReading(
+            client.id,
+            reading: reading,
+            nonReadingReason: reason?.label,
+            observations: _observationsController.text,
+          );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -636,7 +761,9 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Lectura guardada para ${client.ownerName}',
+                    reason == null
+                        ? 'Lectura guardada para ${client.ownerName}'
+                        : 'Visita registrada sin lectura: ${reason.label}',
                     style: GoogleFonts.inter(fontWeight: FontWeight.w500),
                   ),
                 ),
@@ -660,5 +787,94 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
         setState(() => _isSaving = false);
       }
     }
+  }
+
+  /// Asks the reader to confirm a negative or abnormally high consumption.
+  /// Returns true when the reading should be saved.
+  Future<bool> _confirmUnusualConsumption(
+      ClientMeterRecord client, int reading) async {
+    final consumption = reading - client.readingOneMonthAgo;
+    final previousConsumption =
+        client.readingOneMonthAgo - client.readingTwoMonthsAgo;
+
+    if (consumption < 0) {
+      return _showConsumptionWarning(
+        title: 'Consumo negativo',
+        message: 'La lectura ingresada ($reading m³) es menor que la anterior '
+            '(${client.readingOneMonthAgo} m³), lo que da un consumo de '
+            '$consumption m³.\n\n'
+            'Puede ser un error de digitación o que el medidor dio la vuelta '
+            '(por ejemplo, de 9999 a 0). Verifique el medidor.',
+      );
+    }
+
+    if (previousConsumption > 0 && consumption > previousConsumption * 3) {
+      return _showConsumptionWarning(
+        title: 'Consumo anormal',
+        message: 'El consumo calculado ($consumption m³) es más del triple '
+            'del consumo del mes anterior ($previousConsumption m³).\n\n'
+            'Verifique la lectura o si hay una posible fuga.',
+      );
+    }
+
+    return true;
+  }
+
+  Future<bool> _showConsumptionWarning({
+    required String title,
+    required String message,
+  }) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surfaceCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded,
+                color: AppTheme.warningAmber),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                title,
+                style: GoogleFonts.inter(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: GoogleFonts.inter(fontSize: 14, color: AppTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(
+              'Corregir',
+              style: GoogleFonts.inter(
+                fontWeight: FontWeight.w600,
+                color: AppTheme.accentCyan,
+              ),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.warningAmber,
+            ),
+            child: Text(
+              'Guardar de todos modos',
+              style: GoogleFonts.inter(color: Colors.white),
+            ),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
   }
 }

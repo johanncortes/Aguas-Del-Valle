@@ -190,6 +190,11 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                     if (value == null || value.trim().isEmpty) {
                       return 'Ingrese el número de cliente';
                     }
+                    if (ref
+                        .read(clientRecordsProvider.notifier)
+                        .isClientNumberTaken(value)) {
+                      return 'Ya existe un cliente con este N°';
+                    }
                     return null;
                   },
                 ),
@@ -199,6 +204,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                 _buildLabel('Lecturas Anteriores'),
                 const SizedBox(height: 6),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
                       child: TextFormField(
@@ -222,6 +228,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: TextFormField(
+                        key: const Key('reading1MonthField'),
                         controller: _reading1MonthController,
                         keyboardType: TextInputType.number,
                         inputFormatters: [
@@ -234,9 +241,19 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                         decoration: InputDecoration(
                           labelText: 'Hace 1 mes',
                           labelStyle: GoogleFonts.inter(fontSize: 12),
+                          errorMaxLines: 3,
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 14),
                         ),
+                        validator: (value) {
+                          // A meter only counts up: the newer reading
+                          // can't be lower than the older one.
+                          if (_parseReading(value) <
+                              _parseReading(_reading2MonthsController.text)) {
+                            return 'No puede ser menor que la de hace 2 meses';
+                          }
+                          return null;
+                        },
                       ),
                     ),
                   ],
@@ -333,6 +350,9 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
     );
   }
 
+  /// Empty history fields are saved as 0.
+  int _parseReading(String? text) => int.tryParse(text?.trim() ?? '') ?? 0;
+
   Widget _buildLabel(String text) {
     return Text(
       text,
@@ -360,10 +380,8 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
             clientNumber: _clientNumberController.text.trim(),
             latitude: widget.location.latitude,
             longitude: widget.location.longitude,
-            readingTwoMonthsAgo:
-                int.tryParse(_reading2MonthsController.text) ?? 0,
-            readingOneMonthAgo:
-                int.tryParse(_reading1MonthController.text) ?? 0,
+            readingTwoMonthsAgo: _parseReading(_reading2MonthsController.text),
+            readingOneMonthAgo: _parseReading(_reading1MonthController.text),
             currentReading: currentReading,
           );
 
