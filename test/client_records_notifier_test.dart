@@ -260,20 +260,23 @@ void main() {
     });
   });
 
-  group('fix location from GPS', () {
-    test('saves the device position as the official location', () async {
-      final position = await notifier.fixLocationFromGps('sp-001');
+  test('updateClientLocation gives an unlocated client its map position',
+      () async {
+    await notifier.importClients([
+      ClientMeterRecord(
+        id: 'seed-7',
+        clientNumber: '7',
+        ownerName: 'Reinaldo Bravo Alvarez',
+        readingTwoMonthsAgo: 0,
+        readingOneMonthAgo: 0,
+      ),
+    ]);
+    expect(record('seed-7').hasLocation, isFalse);
 
-      expect(position?.latitude, -30.7296);
-      expect(record('sp-001').latitude, -30.7296);
-      expect(record('sp-001').longitude, -70.7644);
-    });
+    await notifier.updateClientLocation('seed-7', -30.7301, -70.7652);
 
-    test('changes nothing when no location is available', () async {
-      location.position = null;
-
-      expect(await notifier.fixLocationFromGps('sp-001'), isNull);
-      expect(record('sp-001').latitude, -30.728); // unchanged
-    });
+    expect(record('seed-7').latitude, -30.7301);
+    expect(record('seed-7').longitude, -70.7652);
+    expect(record('seed-7').hasLocation, isTrue);
   });
 }

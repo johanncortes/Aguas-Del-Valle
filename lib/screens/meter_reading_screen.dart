@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/client_meter_record.dart';
+import '../providers/client_list_providers.dart';
 import '../providers/meter_providers.dart';
 import '../services/photo_service.dart';
 import '../theme/app_fonts.dart';
@@ -34,7 +35,6 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
 
   late final PhotoService _photoService;
   bool _isTakingPhoto = false;
-  bool _isFixingLocation = false;
 
   /// Evidence photo shown on screen (saved with the visit).
   String? _photoPath;
@@ -210,8 +210,8 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Este cliente aún no tiene ubicación en el mapa. Párese '
-                  'junto al medidor y fíjela con el GPS.',
+                  'Este cliente aún no tiene ubicación en el mapa. Ubíquelo '
+                  'moviendo el mapa bajo la mira.',
                   style: AppFonts.text(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -223,21 +223,10 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
-            onPressed: _isFixingLocation ? null : () => _fixLocation(client),
-            icon: _isFixingLocation
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2.5,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Icon(Icons.my_location),
+            onPressed: () => _pickLocationOnMap(client),
+            icon: const Icon(Icons.add_location_alt_outlined),
             label: Text(
-              _isFixingLocation
-                  ? 'Obteniendo ubicación...'
-                  : 'Fijar Ubicación en el Mapa (GPS)',
+              'Ubicar manualmente en el mapa',
               style: AppFonts.text(fontSize: 15, fontWeight: FontWeight.w700),
             ),
             style: ElevatedButton.styleFrom(
@@ -251,32 +240,10 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
     );
   }
 
-  Future<void> _fixLocation(ClientMeterRecord client) async {
-    setState(() => _isFixingLocation = true);
-    try {
-      final position = await ref
-          .read(clientRecordsProvider.notifier)
-          .fixLocationFromGps(client.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            position != null
-                ? 'Ubicación fijada: ${position.latitude.toStringAsFixed(5)}, '
-                    '${position.longitude.toStringAsFixed(5)}'
-                : 'No se pudo obtener la ubicación. Active el GPS y el '
-                    'permiso de ubicación, e intente de nuevo.',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error al fijar la ubicación: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _isFixingLocation = false);
-    }
+  /// Sends the reader to the map to place this client's pin by hand.
+  void _pickLocationOnMap(ClientMeterRecord client) {
+    ref.read(locationPickerClientProvider.notifier).state = client.id;
+    Navigator.of(context).popUntil((route) => route.isFirst);
   }
 
   Widget _buildClientInfoCard(ClientMeterRecord client) {

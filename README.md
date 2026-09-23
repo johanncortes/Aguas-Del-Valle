@@ -71,8 +71,10 @@ oficiales de `lib/data/initial_clients.dart` con su N° de cliente, nombre y
 sector. Esa lista no trae coordenadas ni lecturas anteriores: las lecturas
 parten en 0 y los clientes **no aparecen en el mapa** hasta tener ubicación.
 
-Para ubicarlos: en la **Lista de clientes** (aparecen como "Sin ubicación"),
-abra el cliente parado junto al medidor y presione **Fijar Ubicación en el
-Mapa (GPS)**. También se puede importar una ruta Excel con Latitud/Longitud
+Para ubicarlos (no hace falta estar en terreno): en la **Lista de
+clientes** (aparecen como "Sin ubicación") abra el cliente y presione
+**Ubicar manualmente en el mapa**. La app vuelve al mapa con una mira fija
+en el centro: mueva el mapa hasta dejar la casa bajo la mira y presione
+**Confirmar Ubicación** (o **Cancelar**). También se puede importar una ruta Excel con Latitud/Longitud
 reales (reemplaza la lista precargada); en el Excel, las coordenadas vacías
 o "-" se importan como "sin ubicación".
