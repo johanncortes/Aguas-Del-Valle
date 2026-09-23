@@ -279,4 +279,109 @@ void main() {
     expect(record('seed-7').longitude, -70.7652);
     expect(record('seed-7').hasLocation, isTrue);
   });
+
+  group('client editing', () {
+    test('updateClientData changes master data and keeps the cycle',
+        () async {
+      await notifier.saveReading('sp-001',
+          reading: 1300, photoPath: '/p/a.jpg', observations: 'ok');
+
+      await notifier.updateClientData('sp-001',
+          ownerName: '  Nuevo Nombre ',
+          sector: 'Varillar',
+          readingOneMonthAgo: 1270,
+          readingTwoMonthsAgo: 1250);
+
+      final r = record('sp-001');
+      expect(r.ownerName, 'Nuevo Nombre');
+      expect(r.sector, 'Varillar');
+      expect(r.readingOneMonthAgo, 1270);
+      expect(r.readingTwoMonthsAgo, 1250);
+      // Cycle and location untouched
+      expect(r.currentReading, 1300);
+      expect(r.isVisited, isTrue);
+      expect(r.photoPath, '/p/a.jpg');
+      expect(r.observations, 'ok');
+      expect(r.readingLatitude, -30.7296);
+      expect(r.latitude, -30.728);
+    });
+
+    test('updateClientData clears an empty sector', () async {
+      await notifier.updateClientData('sp-001',
+          ownerName: 'A',
+          sector: 'Varillar',
+          readingOneMonthAgo: 10,
+          readingTwoMonthsAgo: 5);
+      await notifier.updateClientData('sp-001',
+          ownerName: 'A',
+          sector: '  ',
+          readingOneMonthAgo: 10,
+          readingTwoMonthsAgo: 5);
+      expect(record('sp-001').sector, isNull);
+    });
+
+    test('updateClientData rejects a decreasing history', () async {
+      await expectLater(
+        notifier.updateClientData('sp-001',
+            ownerName: 'A',
+            sector: null,
+            readingOneMonthAgo: 5,
+            readingTwoMonthsAgo: 10),
+        throwsArgumentError,
+      );
+      expect(record('sp-001').readingOneMonthAgo, 1268);
+    });
+
+    test('clearClientLocation removes only the location', () async {
+      await notifier.saveReading('sp-001', reading: 1300);
+      await notifier.clearClientLocation('sp-001');
+
+      final r = record('sp-001');
+      expect(r.hasLocation, isFalse);
+      expect(r.currentReading, 1300);
+      expect(r.ownerName, 'Cliente sp-001');
+    });
+  });
+
+  group('base template merge', () {
+    ClientMeterRecord templateRow(String number,
+            {double? lat, double? lng, String? sector}) =>
+        ClientMeterRecord(
+          id: 'imp-$number',
+          clientNumber: number,
+          ownerName: 'Oficina $number',
+          readingTwoMonthsAgo: 1200,
+          readingOneMonthAgo: 1250,
+          latitude: lat,
+          longitude: lng,
+          sector: sector,
+        );
+
+    test('updates master data, adds new clients and keeps the cycle',
+        () async {
+      await notifier.saveReading('sp-001', reading: 1300);
+
+      final result = await notifier.mergeClients([
+        templateRow('40225001', lat: -30.71, lng: -70.71, sector: 'Angostura'),
+        templateRow('50000001'),
+      ]);
+
+      expect(result, (updated: 1, added: 1));
+      final r = record('sp-001');
+      expect(r.ownerName, 'Oficina 40225001');
+      expect(r.sector, 'Angostura');
+      expect(r.latitude, -30.71);
+      expect(r.readingOneMonthAgo, 1250);
+      expect(r.currentReading, 1300); // today's reading kept
+      expect(r.isVisited, isTrue);
+      // Clients missing from the file are kept
+      expect(notifier.state.map((c) => c.clientNumber),
+          containsAll(['40225002', '40225003', '50000001']));
+    });
+
+    test('empty coordinates do not erase a placed location', () async {
+      await notifier.mergeClients([templateRow('40225001')]);
+      expect(record('sp-001').latitude, -30.728);
+    });
+  });
 }

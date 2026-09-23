@@ -103,6 +103,38 @@ class ClientMeterRecord {
     );
   }
 
+  /// Returns this record with its master data (what the office manages)
+  /// replaced, keeping every per-cycle field intact: current reading,
+  /// visit state, reason, observations, photo and reading GPS. Unlike
+  /// [copyWith], [sector], [latitude] and [longitude] can be set to null.
+  ClientMeterRecord withMasterData({
+    required String ownerName,
+    required String? sector,
+    required int readingOneMonthAgo,
+    required int readingTwoMonthsAgo,
+    required double? latitude,
+    required double? longitude,
+  }) {
+    return ClientMeterRecord(
+      id: id,
+      clientNumber: clientNumber,
+      ownerName: ownerName,
+      readingTwoMonthsAgo: readingTwoMonthsAgo,
+      readingOneMonthAgo: readingOneMonthAgo,
+      currentReading: currentReading,
+      isVisited: isVisited,
+      latitude: latitude,
+      longitude: longitude,
+      updatedAt: updatedAt,
+      nonReadingReason: nonReadingReason,
+      observations: observations,
+      readingLatitude: readingLatitude,
+      readingLongitude: readingLongitude,
+      photoPath: photoPath,
+      sector: sector,
+    );
+  }
+
   ClientMeterRecord copyWith({
     String? id,
     String? clientNumber,

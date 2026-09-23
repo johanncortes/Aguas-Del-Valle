@@ -96,6 +96,33 @@ void main() {
     });
   });
 
+  test('withMasterData replaces master data and keeps the cycle', () {
+    final r = _record(
+      currentReading: 145,
+      isVisited: true,
+      observations: 'ok',
+    ).copyWith(photoPath: '/p/a.jpg', readingLatitude: -30.7);
+
+    final edited = r.withMasterData(
+      ownerName: 'Otro',
+      sector: null,
+      readingOneMonthAgo: 130,
+      readingTwoMonthsAgo: 110,
+      latitude: null,
+      longitude: null,
+    );
+
+    expect(edited.ownerName, 'Otro');
+    expect(edited.readingOneMonthAgo, 130);
+    expect(edited.hasLocation, isFalse);
+    expect(edited.currentReading, 145);
+    expect(edited.isVisited, isTrue);
+    expect(edited.observations, 'ok');
+    expect(edited.photoPath, '/p/a.jpg');
+    expect(edited.readingLatitude, -30.7);
+    expect(edited.id, r.id);
+  });
+
   group('visitStatus', () {
     test('pending when not visited', () {
       expect(_record().visitStatus, VisitStatus.pending);

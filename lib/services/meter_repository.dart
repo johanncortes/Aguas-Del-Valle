@@ -141,6 +141,12 @@ class MeterRepository {
     });
   }
 
+  /// Insert or overwrite [records], keeping every other client.
+  Future<void> saveClients(Iterable<ClientMeterRecord> records) async {
+    final box = await _getBox();
+    await box.putAll({for (final r in records) r.id: r});
+  }
+
   /// Replace every stored client with [records] (monthly route import).
   /// New records are written before old ones are deleted, so a failure
   /// part-way never leaves the route empty.

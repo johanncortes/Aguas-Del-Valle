@@ -19,8 +19,27 @@ samples, guidance on mobile development, and a full API reference.
 
 ## Importar la ruta del mes (Excel)
 
-Menú ⋮ → **Importar Ruta (Excel)**. Reemplaza todos los clientes actuales
-por los del archivo (exporta antes las lecturas del ciclo).
+Menú ⋮ → **Importar Ruta (Excel)**. Según el archivo:
+
+- **Plantilla base** (sin columna "Lectura Actual"): actualiza por N° de
+  cliente el nombre, sector, historial y ubicación; agrega los clientes
+  nuevos como pendientes y no borra ninguno. Las lecturas del ciclo en curso
+  se conservan, y una coordenada vacía no borra un pin ya ubicado.
+- **Excel exportado completo** (con "Lectura Actual"): reemplaza todos los
+  clientes y avanza el mes (exporta antes las lecturas del ciclo).
+
+### Flujo oficina ↔ operario
+
+1. Menú ⋮ → **Exportar Plantilla Base (Solo ubicaciones)**: genera un Excel
+   con N° Cliente, Nombre, Sector, Latitud, Longitud y las dos lecturas
+   anteriores (sin datos del ciclo).
+2. La oficina completa o corrige ubicaciones y datos en ese archivo.
+3. El operario lo importa: se actualizan pines y datos sin perder las
+   lecturas que ya tomó.
+
+Cada cliente también se puede corregir en terreno: en su ficha, el lápiz
+abre **Editar Cliente** (nombre, sector e historial; el N° no cambia) y
+permite **Borrar ubicación del mapa**.
 
 El archivo debe ser `.xlsx` y tener una fila de encabezados (puede haber un
 título arriba) con estas columnas, en cualquier orden:

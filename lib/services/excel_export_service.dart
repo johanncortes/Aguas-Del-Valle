@@ -19,6 +19,19 @@ class ExcelExportService {
   /// Columns of the exported sheet. The first ones (N° Cliente, Nombre,
   /// Latitud, Longitud, the readings) are the ones the route import
   /// reads, so an exported file can be imported as next month's route.
+  /// Headers kept in the base template: only master data and locations,
+  /// the columns the route import reads. No cycle data (current reading,
+  /// status, reason, observations, GPS audit, photo).
+  static const _baseTemplateHeaders = {
+    'N° Cliente',
+    'Nombre Propietario',
+    'Sector',
+    'Latitud',
+    'Longitud',
+    'Lectura Hace 2 Meses',
+    'Lectura Hace 1 Mes',
+  };
+
   static final List<_ExportColumn> _columns = [
     _text('N° Cliente', 15, (r) => r.clientNumber),
     _text('Nombre Propietario', 35, (r) => r.ownerName, leftAligned: true),
@@ -89,7 +102,19 @@ class ExcelExportService {
 
   /// Builds the .xlsx with every client of the route (pending ones
   /// included, so the file is a complete route), sorted by client number.
-  List<int> buildExcelBytes(List<ClientMeterRecord> records) {
+  ///
+  /// With [isBaseTemplate] only the master-data columns are written (see
+  /// [_baseTemplateHeaders]); importing that file updates clients without
+  /// touching the cycle in progress.
+  List<int> buildExcelBytes(
+    List<ClientMeterRecord> records, {
+    bool isBaseTemplate = false,
+  }) {
+    final columns = isBaseTemplate
+        ? _columns
+            .where((c) => _baseTemplateHeaders.contains(c.header))
+            .toList()
+        : _columns;
     final excel = Excel.createExcel();
 
     // Rename the default sheet: delete() is a no-op on a workbook's only
@@ -114,17 +139,17 @@ class ExcelExportService {
       fontSize: 11,
     );
 
-    for (var col = 0; col < _columns.length; col++) {
-      sheet.setColumnWidth(col, _columns[col].width);
+    for (var col = 0; col < columns.length; col++) {
+      sheet.setColumnWidth(col, columns[col].width);
       sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: 0))
-        ..value = TextCellValue(_columns[col].header)
+        ..value = TextCellValue(columns[col].header)
         ..cellStyle = headerStyle;
     }
 
     final sorted = [...records]..sort(_compareClientNumbers);
     for (var i = 0; i < sorted.length; i++) {
-      for (var col = 0; col < _columns.length; col++) {
-        final column = _columns[col];
+      for (var col = 0; col < columns.length; col++) {
+        final column = columns[col];
         sheet.cell(CellIndex.indexByColumnRow(columnIndex: col, rowIndex: i + 1))
           ..value = column.value(sorted[i])
           ..cellStyle = column.leftAligned ? leftStyle : dataStyle;
@@ -147,11 +172,15 @@ class ExcelExportService {
   }
 
   /// Generate and save the .xlsx file in the app documents directory.
-  Future<File> generateExcel(List<ClientMeterRecord> records) async {
-    final bytes = buildExcelBytes(records);
+  Future<File> generateExcel(
+    List<ClientMeterRecord> records, {
+    bool isBaseTemplate = false,
+  }) async {
+    final bytes = buildExcelBytes(records, isBaseTemplate: isBaseTemplate);
     final dir = await getApplicationDocumentsDirectory();
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-    final file = File('${dir.path}/lecturas_monte_patria_$timestamp.xlsx');
+    final name = isBaseTemplate ? 'plantilla_base' : 'lecturas_monte_patria';
+    final file = File('${dir.path}/${name}_$timestamp.xlsx');
     await file.writeAsBytes(bytes);
     return file;
   }

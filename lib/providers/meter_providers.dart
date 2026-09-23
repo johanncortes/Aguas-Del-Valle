@@ -152,6 +152,85 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     state = await _repository.getAllClients();
   }
 
+  /// Edits a client's master data (name, sector and reading history).
+  /// The current cycle (reading, visit state, reason, observations, photo)
+  /// and the location are not touched. An empty [sector] clears it.
+  Future<void> updateClientData(
+    String clientId, {
+    required String ownerName,
+    required String? sector,
+    required int readingOneMonthAgo,
+    required int readingTwoMonthsAgo,
+  }) async {
+    if (readingOneMonthAgo < readingTwoMonthsAgo) {
+      throw ArgumentError(
+          'La lectura de hace 1 mes no puede ser menor que la de hace 2 meses.');
+    }
+    final client = await _repository.getClient(clientId);
+    if (client == null) return;
+    final trimmedSector = sector?.trim();
+    await _repository.saveClient(client.withMasterData(
+      ownerName: ownerName.trim(),
+      sector:
+          (trimmedSector == null || trimmedSector.isEmpty) ? null : trimmedSector,
+      readingOneMonthAgo: readingOneMonthAgo,
+      readingTwoMonthsAgo: readingTwoMonthsAgo,
+      latitude: client.latitude,
+      longitude: client.longitude,
+    ));
+    state = await _repository.getAllClients();
+  }
+
+  /// Removes the client's map location (its pin disappears until it is
+  /// placed again). Nothing else changes.
+  Future<void> clearClientLocation(String clientId) async {
+    final client = await _repository.getClient(clientId);
+    if (client == null) return;
+    await _repository.saveClient(client.withMasterData(
+      ownerName: client.ownerName,
+      sector: client.sector,
+      readingOneMonthAgo: client.readingOneMonthAgo,
+      readingTwoMonthsAgo: client.readingTwoMonthsAgo,
+      latitude: null,
+      longitude: null,
+    ));
+    state = await _repository.getAllClients();
+  }
+
+  /// Applies a base template (route file without "Lectura Actual") on top
+  /// of the current route, matching clients by N° de cliente:
+  /// - existing clients get the file's name, sector, reading history and,
+  ///   when the file has them, coordinates (empty coordinates never erase
+  ///   a location already placed); their current cycle is kept intact.
+  /// - clients not in the route are added as pending.
+  /// - clients missing from the file are kept (no reading is ever lost).
+  Future<({int updated, int added})> mergeClients(
+      List<ClientMeterRecord> records) async {
+    final byNumber = {for (final c in state) c.clientNumber.trim(): c};
+    final toSave = <ClientMeterRecord>[];
+    var updated = 0, added = 0;
+    for (final record in records) {
+      final existing = byNumber[record.clientNumber.trim()];
+      if (existing == null) {
+        toSave.add(record);
+        added++;
+        continue;
+      }
+      toSave.add(existing.withMasterData(
+        ownerName: record.ownerName,
+        sector: record.sector ?? existing.sector,
+        readingOneMonthAgo: record.readingOneMonthAgo,
+        readingTwoMonthsAgo: record.readingTwoMonthsAgo,
+        latitude: record.hasLocation ? record.latitude : existing.latitude,
+        longitude: record.hasLocation ? record.longitude : existing.longitude,
+      ));
+      updated++;
+    }
+    await _repository.saveClients(toSave);
+    state = await _repository.getAllClients();
+    return (updated: updated, added: added);
+  }
+
   /// Reset all readings for a new cycle
   Future<void> resetAll() async {
     await _repository.resetAllReadings();
