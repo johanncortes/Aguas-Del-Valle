@@ -33,9 +33,7 @@ class AppTheme {
         onSurface: textPrimary,
         onError: Colors.white,
       ),
-      textTheme: GoogleFonts.interTextTheme(
-        ThemeData.dark().textTheme,
-      ).apply(
+      textTheme: ThemeData.dark().textTheme.apply(
         bodyColor: textPrimary,
         displayColor: textPrimary,
       ),
@@ -43,7 +41,7 @@ class AppTheme {
         backgroundColor: surfaceDark,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: GoogleFonts.inter(
+        titleTextStyle: AppFonts.text(
           fontSize: 20,
           fontWeight: FontWeight.w700,
           color: textPrimary,
@@ -73,7 +71,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(14),
           ),
-          textStyle: GoogleFonts.inter(
+          textStyle: AppFonts.text(
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -95,12 +93,12 @@ class AppTheme {
           borderRadius: BorderRadius.circular(14),
           borderSide: const BorderSide(color: errorRed, width: 2),
         ),
-        labelStyle: GoogleFonts.inter(color: textSecondary),
-        hintStyle: GoogleFonts.inter(color: textSecondary.withValues(alpha: 0.5)),
+        labelStyle: AppFonts.text(color: textSecondary),
+        hintStyle: AppFonts.text(color: textSecondary.withValues(alpha: 0.5)),
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: surfaceCard,
-        contentTextStyle: GoogleFonts.inter(color: textPrimary),
+        contentTextStyle: AppFonts.text(color: textPrimary),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,
       ),

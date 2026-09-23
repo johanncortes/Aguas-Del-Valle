@@ -35,7 +35,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen> {
         backgroundColor: AppTheme.surfaceDark,
         title: Text(
           'Clientes',
-          style: GoogleFonts.inter(fontWeight: FontWeight.w700),
+          style: AppFonts.text(fontWeight: FontWeight.w700),
         ),
       ),
       body: Column(
@@ -69,7 +69,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen> {
     return TextField(
       controller: _searchController,
       textInputAction: TextInputAction.search,
-      style: GoogleFonts.inter(fontSize: 15, color: AppTheme.textPrimary),
+      style: AppFonts.text(fontSize: 15, color: AppTheme.textPrimary),
       decoration: InputDecoration(
         hintText: 'Buscar por nombre o N° de cliente',
         prefixIcon: const Icon(Icons.search, color: AppTheme.textSecondary),
@@ -116,7 +116,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen> {
               avatar: status == null
                   ? null
                   : Icon(status.badgeIcon, size: 16, color: status.color),
-              labelStyle: GoogleFonts.inter(
+              labelStyle: AppFonts.text(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: AppTheme.textPrimary,
@@ -157,7 +157,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen> {
           client.ownerName,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.inter(
+          style: AppFonts.text(
             fontSize: 15,
             fontWeight: FontWeight.w600,
             color: AppTheme.textPrimary,
@@ -167,7 +167,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen> {
           'N° ${client.clientNumber} • $detail',
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary),
+          style: AppFonts.text(fontSize: 12, color: AppTheme.textSecondary),
         ),
         trailing:
             const Icon(Icons.chevron_right, color: AppTheme.textSecondary),
@@ -194,7 +194,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen> {
             Text(
               'No hay clientes que coincidan',
               textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
+              style: AppFonts.text(
                 fontSize: 15,
                 color: AppTheme.textSecondary,
               ),

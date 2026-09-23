@@ -95,7 +95,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                         children: [
                           Text(
                             'Añadir Nuevo Cliente',
-                            style: GoogleFonts.inter(
+                            style: AppFonts.text(
                               fontSize: 18,
                               fontWeight: FontWeight.w700,
                               color: AppTheme.textPrimary,
@@ -105,7 +105,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                           Text(
                             'Lat: ${widget.location.latitude.toStringAsFixed(6)}, '
                             'Lng: ${widget.location.longitude.toStringAsFixed(6)}',
-                            style: GoogleFonts.robotoMono(
+                            style: AppFonts.mono(
                               fontSize: 11,
                               color: AppTheme.textSecondary,
                             ),
@@ -136,7 +136,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                       const SizedBox(width: 6),
                       Text(
                         'Ubicación seleccionada en el mapa',
-                        style: GoogleFonts.inter(
+                        style: AppFonts.text(
                           fontSize: 12,
                           color: AppTheme.visitedGreen,
                           fontWeight: FontWeight.w500,
@@ -153,7 +153,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                 TextFormField(
                   controller: _nameController,
                   textCapitalization: TextCapitalization.words,
-                  style: GoogleFonts.inter(
+                  style: AppFonts.text(
                     fontSize: 15,
                     color: AppTheme.textPrimary,
                   ),
@@ -176,7 +176,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                 TextFormField(
                   controller: _clientNumberController,
                   keyboardType: TextInputType.text,
-                  style: GoogleFonts.inter(
+                  style: AppFonts.text(
                     fontSize: 15,
                     color: AppTheme.textPrimary,
                   ),
@@ -211,13 +211,13 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly
                         ],
-                        style: GoogleFonts.inter(
+                        style: AppFonts.text(
                           fontSize: 15,
                           color: AppTheme.textPrimary,
                         ),
                         decoration: InputDecoration(
                           labelText: 'Hace 2 meses',
-                          labelStyle: GoogleFonts.inter(fontSize: 12),
+                          labelStyle: AppFonts.text(fontSize: 12),
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 14),
                         ),
@@ -232,13 +232,13 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                         inputFormatters: [
                           FilteringTextInputFormatter.digitsOnly
                         ],
-                        style: GoogleFonts.inter(
+                        style: AppFonts.text(
                           fontSize: 15,
                           color: AppTheme.textPrimary,
                         ),
                         decoration: InputDecoration(
                           labelText: 'Hace 1 mes',
-                          labelStyle: GoogleFonts.inter(fontSize: 12),
+                          labelStyle: AppFonts.text(fontSize: 12),
                           errorMaxLines: 3,
                           contentPadding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 14),
@@ -275,7 +275,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                         ),
                         child: Text(
                           'Cancelar',
-                          style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                          style: AppFonts.text(fontWeight: FontWeight.w600),
                         ),
                       ),
                     ),
@@ -297,7 +297,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                         label: Text(
                           _isSaving ? 'Guardando...' : 'Crear Cliente',
                           style:
-                              GoogleFonts.inter(fontWeight: FontWeight.w700),
+                              AppFonts.text(fontWeight: FontWeight.w700),
                         ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppTheme.accentCyan,
@@ -325,7 +325,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
   Widget _buildLabel(String text) {
     return Text(
       text,
-      style: GoogleFonts.inter(
+      style: AppFonts.text(
         fontSize: 13,
         fontWeight: FontWeight.w600,
         color: AppTheme.textSecondary,
@@ -360,7 +360,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                 Expanded(
                   child: Text(
                     'Cliente "${_nameController.text.trim()}" añadido al mapa',
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w500),
+                    style: AppFonts.text(fontWeight: FontWeight.w500),
                   ),
                 ),
               ],
@@ -374,7 +374,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
           SnackBar(
             content: Text(
               'Error al crear cliente: $e',
-              style: GoogleFonts.inter(),
+              style: AppFonts.text(),
             ),
           ),
         );

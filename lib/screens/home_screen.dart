@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:ui' as ui;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import '../models/client_meter_record.dart';
 import '../providers/meter_providers.dart';
 import '../services/cached_tile_provider.dart';
+import '../services/excel_import_service.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 import '../theme/visit_status_style.dart';
@@ -28,6 +28,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   final MapController _mapController = MapController();
   bool _isLoading = true;
   bool _isExporting = false;
+  bool _isImporting = false;
   bool _isAddPinMode = false;
 
   // Real-time geolocation
@@ -124,6 +125,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               children: [
                 // Map layer
                 _buildMap(clients),
+
+                // First run / empty route hint
+                if (clients.isEmpty)
+                  Center(child: _buildEmptyRouteCard(progress)),
 
                 // Top gradient overlay for status bar
                 Positioned(
@@ -233,7 +238,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         : const Icon(Icons.file_download_outlined),
                     label: Text(
                       _isExporting ? 'Exportando...' : 'Exportar Excel',
-                      style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                      style: AppFonts.text(fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
@@ -266,7 +271,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           Expanded(
             child: Text(
               'Toque en el mapa para colocar un nuevo medidor',
-              style: GoogleFonts.inter(
+              style: AppFonts.text(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: AppTheme.warningAmber,
@@ -302,7 +307,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           Expanded(
             child: Text(
               'Toca el mapa para la nueva ubicación de ${client.ownerName}',
-              style: GoogleFonts.inter(
+              style: AppFonts.text(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: AppTheme.warningAmber,
@@ -366,7 +371,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   'Aguas del Valle',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
+                  style: AppFonts.text(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                     color: AppTheme.textPrimary,
@@ -376,7 +381,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   'Sol de las Praderas • Ruta del día',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
+                  style: AppFonts.text(
                     fontSize: 12,
                     color: AppTheme.textSecondary,
                   ),
@@ -400,7 +405,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
             child: Text(
               '${progress.visited}/${progress.total}',
-              style: GoogleFonts.inter(
+              style: AppFonts.text(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color: progress.percent == 100
@@ -433,8 +438,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         switch (action) {
           case _HeaderMenuAction.closeCycle:
             _confirmCloseCycle(progress);
-          case _HeaderMenuAction.reseed:
-            _confirmReseed();
+          case _HeaderMenuAction.importRoute:
+            _importRoute(progress);
         }
       },
       itemBuilder: (context) => [
@@ -445,29 +450,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               const Icon(Icons.event_repeat,
                   size: 20, color: AppTheme.accentCyan),
               const SizedBox(width: 12),
-              Text(
-                'Cerrar mes e iniciar nuevo ciclo',
-                style: GoogleFonts.inter(color: AppTheme.textPrimary),
+              Flexible(
+                child: Text(
+                  'Cerrar mes e iniciar nuevo ciclo',
+                  style: AppFonts.text(color: AppTheme.textPrimary),
+                ),
               ),
             ],
           ),
         ),
-        // Wipes all data: only available in debug builds
-        if (kDebugMode)
-          PopupMenuItem(
-            value: _HeaderMenuAction.reseed,
-            child: Row(
-              children: [
-                const Icon(Icons.restart_alt,
-                    size: 20, color: AppTheme.errorRed),
-                const SizedBox(width: 12),
-                Text(
-                  'Reiniciar datos de prueba',
-                  style: GoogleFonts.inter(color: AppTheme.textPrimary),
+        PopupMenuItem(
+          value: _HeaderMenuAction.importRoute,
+          enabled: !_isImporting,
+          child: Row(
+            children: [
+              const Icon(Icons.upload_file,
+                  size: 20, color: AppTheme.accentCyan),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  'Importar Ruta (Excel)',
+                  style: AppFonts.text(color: AppTheme.textPrimary),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+        ),
       ],
     );
   }
@@ -483,7 +491,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Cerrar mes',
-          style: GoogleFonts.inter(
+          style: AppFonts.text(
             fontSize: 18,
             fontWeight: FontWeight.w700,
             color: AppTheme.textPrimary,
@@ -496,7 +504,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             Text(
               'Las lecturas actuales pasarán a ser la "lectura anterior" y '
               'todos los clientes quedarán como pendientes para el nuevo ciclo.',
-              style: GoogleFonts.inter(
+              style: AppFonts.text(
                 fontSize: 14,
                 color: AppTheme.textSecondary,
               ),
@@ -520,7 +528,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             onPressed: () => Navigator.pop(dialogContext, false),
             child: Text(
               'Cancelar',
-              style: GoogleFonts.inter(color: AppTheme.textSecondary),
+              style: AppFonts.text(color: AppTheme.textSecondary),
             ),
           ),
           ElevatedButton(
@@ -530,7 +538,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
             child: Text(
               'Cerrar mes',
-              style: GoogleFonts.inter(color: Colors.white),
+              style: AppFonts.text(color: Colors.white),
             ),
           ),
         ],
@@ -553,34 +561,213 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  Future<void> _confirmReseed() async {
+  /// Replaces the whole route with the clients from an Excel file.
+  Future<void> _importRoute(RouteProgress progress) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         backgroundColor: AppTheme.surfaceCard,
-        title: const Text('Reiniciar datos de prueba'),
-        content: const Text(
-          'Se borrarán todos los clientes y lecturas y se cargarán los '
-          'datos de ejemplo.',
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Importar ruta',
+          style: AppFonts.text(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Esto borrará los datos actuales y cargará una nueva ruta. '
+              '¿Continuar?',
+              style: AppFonts.text(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            if (progress.visited > 0) ...[
+              const SizedBox(height: 12),
+              _buildDialogWarning(
+                'Hay ${progress.visited} visita(s) registradas en este '
+                'ciclo. Exporta el Excel antes de importar o se perderán.',
+              ),
+            ],
+          ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Cancelar'),
+            child: Text(
+              'Cancelar',
+              style: AppFonts.text(color: AppTheme.textSecondary),
+            ),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.errorRed,
+              backgroundColor: AppTheme.warningAmber,
             ),
-            child: const Text('Borrar todo'),
+            child: Text(
+              'Elegir archivo',
+              style: AppFonts.text(color: Colors.white),
+            ),
           ),
         ],
       ),
     );
 
     if (confirmed != true || !mounted) return;
-    await ref.read(clientRecordsProvider.notifier).resetAndReseed();
+    setState(() => _isImporting = true);
+
+    try {
+      final records = await ref.read(excelImportServiceProvider).pickAndParse();
+      if (records == null || !mounted) return; // picker cancelled
+
+      final count = await ref
+          .read(clientRecordsProvider.notifier)
+          .importClients(records);
+      if (!mounted) return;
+
+      _fitMapToClients(records);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Se importaron $count clientes.')),
+      );
+    } on ExcelImportException catch (e) {
+      if (!mounted) return;
+      if (e.rowErrors.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message)),
+        );
+      } else {
+        // Row errors don't fit in a SnackBar: list them so the office
+        // can fix the file.
+        _showImportErrors(e);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al importar: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _isImporting = false);
+    }
+  }
+
+  void _showImportErrors(ExcelImportException error) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppTheme.surfaceCard,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'No se pudo importar',
+          style: AppFonts.text(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                error.message,
+                style: AppFonts.text(
+                  fontSize: 14,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              for (final rowError in error.rowErrors)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Text(
+                    '• $rowError',
+                    style: AppFonts.text(
+                      fontSize: 13,
+                      color: AppTheme.warningAmber,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'Entendido',
+              style: AppFonts.text(color: AppTheme.accentCyan),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Moves the map to show every client (an imported route may be in a
+  /// different sector than the default center).
+  void _fitMapToClients(List<ClientMeterRecord> clients) {
+    if (clients.isEmpty) return;
+    _mapController.fitCamera(
+      CameraFit.coordinates(
+        coordinates: [
+          for (final c in clients) LatLng(c.latitude, c.longitude),
+        ],
+        padding: const EdgeInsets.fromLTRB(40, 120, 40, 220),
+        maxZoom: 17,
+      ),
+    );
+  }
+
+  Widget _buildEmptyRouteCard(RouteProgress progress) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 32),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceDark.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.accentCyan.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.route, size: 40, color: AppTheme.accentCyan),
+          const SizedBox(height: 12),
+          Text(
+            'No hay clientes cargados',
+            textAlign: TextAlign.center,
+            style: AppFonts.text(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Importa la ruta del mes desde un Excel, o mantén presionado '
+            'el mapa para agregar un cliente.',
+            textAlign: TextAlign.center,
+            style: AppFonts.text(fontSize: 13, color: AppTheme.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: _isImporting ? null : () => _importRoute(progress),
+            icon: const Icon(Icons.upload_file),
+            label: const Text('Importar Ruta (Excel)'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppTheme.primaryLight,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildDialogWarning(String text) {
@@ -602,7 +789,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           Expanded(
             child: Text(
               text,
-              style: GoogleFonts.inter(
+              style: AppFonts.text(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 color: AppTheme.warningAmber,
@@ -901,7 +1088,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Eliminar Cliente',
-          style: GoogleFonts.inter(
+          style: AppFonts.text(
             fontSize: 18,
             fontWeight: FontWeight.w700,
             color: AppTheme.textPrimary,
@@ -909,7 +1096,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         ),
         content: Text(
           '¿Seguro que deseas eliminar a ${client.ownerName} (N° ${client.clientNumber})?',
-          style: GoogleFonts.inter(
+          style: AppFonts.text(
             fontSize: 14,
             color: AppTheme.textSecondary,
           ),
@@ -919,7 +1106,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             onPressed: () => Navigator.pop(context),
             child: Text(
               'Cancelar',
-              style: GoogleFonts.inter(color: AppTheme.textSecondary),
+              style: AppFonts.text(color: AppTheme.textSecondary),
             ),
           ),
           ElevatedButton(
@@ -938,7 +1125,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
             child: Text(
               'Eliminar',
-              style: GoogleFonts.inter(color: Colors.white),
+              style: AppFonts.text(color: Colors.white),
             ),
           ),
         ],
@@ -1020,7 +1207,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         client.visitStatus == VisitStatus.noReading
                             ? 'Sin lectura: ${client.nonReadingReason ?? '-'}'
                             : client.visitStatus.label,
-                        style: GoogleFonts.inter(
+                        style: AppFonts.text(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                           color: client.visitStatus.color,
@@ -1032,7 +1219,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 const Spacer(),
                 Text(
                   'N° ${client.clientNumber}',
-                  style: GoogleFonts.inter(
+                  style: AppFonts.text(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.accentCyan,
@@ -1044,7 +1231,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             // Client name
             Text(
               client.ownerName,
-              style: GoogleFonts.inter(
+              style: AppFonts.text(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: AppTheme.textPrimary,
@@ -1086,7 +1273,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     VisitStatus.read => 'Editar Lectura',
                     VisitStatus.noReading => 'Reintentar Lectura',
                   },
-                  style: GoogleFonts.inter(
+                  style: AppFonts.text(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),
@@ -1113,7 +1300,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         size: 18, color: AppTheme.accentCyan),
                     label: Text(
                       'Reubicar',
-                      style: GoogleFonts.inter(
+                      style: AppFonts.text(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.accentCyan,
@@ -1136,7 +1323,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         size: 18, color: AppTheme.errorRed),
                     label: Text(
                       'Eliminar',
-                      style: GoogleFonts.inter(
+                      style: AppFonts.text(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: AppTheme.errorRed,
@@ -1177,7 +1364,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           children: [
             Text(
               label,
-              style: GoogleFonts.inter(
+              style: AppFonts.text(
                 fontSize: 10,
                 color: AppTheme.textSecondary,
               ),
@@ -1186,7 +1373,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             const SizedBox(height: 4),
             Text(
               value,
-              style: GoogleFonts.inter(
+              style: AppFonts.text(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
                 color: highlight ? AppTheme.accentCyan : AppTheme.textPrimary,
@@ -1233,7 +1420,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   'Progreso de Ruta',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.inter(
+                  style: AppFonts.text(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
                     color: AppTheme.textPrimary,
@@ -1242,7 +1429,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
               Text(
                 '${progress.percent.toStringAsFixed(0)}%',
-                style: GoogleFonts.inter(
+                style: AppFonts.text(
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: AppTheme.accentCyan,
@@ -1317,7 +1504,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             const SizedBox(width: 6),
             Text(
               value,
-              style: GoogleFonts.inter(
+              style: AppFonts.text(
                 fontSize: 20,
                 fontWeight: FontWeight.w800,
                 color: color,
@@ -1328,7 +1515,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         const SizedBox(height: 2),
         Text(
           label,
-          style: GoogleFonts.inter(
+          style: AppFonts.text(
             fontSize: 12,
             color: AppTheme.textSecondary,
           ),
@@ -1371,7 +1558,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 const SizedBox(width: 12),
                 Text(
                   'No hay lecturas registradas para exportar',
-                  style: GoogleFonts.inter(),
+                  style: AppFonts.text(),
                 ),
               ],
             ),
@@ -1397,7 +1584,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 Expanded(
                   child: Text(
                     'Archivo guardado en: ${file.path}',
-                    style: GoogleFonts.inter(
+                    style: AppFonts.text(
                       fontSize: 13,
                       fontWeight: FontWeight.w500,
                     ),
@@ -1420,7 +1607,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 Expanded(
                   child: Text(
                     'Error al exportar: $e',
-                    style: GoogleFonts.inter(),
+                    style: AppFonts.text(),
                   ),
                 ),
               ],
@@ -1436,7 +1623,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 }
 
-enum _HeaderMenuAction { closeCycle, reseed }
+enum _HeaderMenuAction { closeCycle, importRoute }
 
 /// Custom painter for the triangular pin tail
 class _PinTailPainter extends CustomPainter {

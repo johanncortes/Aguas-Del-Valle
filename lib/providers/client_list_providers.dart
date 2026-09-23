@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/client_meter_record.dart';
+import '../utils/text_normalize.dart';
 import 'meter_providers.dart';
 
 /// Text typed in the client list search bar.
@@ -28,17 +29,3 @@ final filteredClientsProvider =
 
   return filtered;
 });
-
-const _accents = {
-  'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u', 'ü': 'u', 'ñ': 'n',
-};
-
-/// Lowercases, trims and strips Spanish accents so "munoz" finds "Muñoz".
-String normalizeForSearch(String text) {
-  final lower = text.trim().toLowerCase();
-  final buffer = StringBuffer();
-  for (final char in lower.split('')) {
-    buffer.write(_accents[char] ?? char);
-  }
-  return buffer.toString();
-}

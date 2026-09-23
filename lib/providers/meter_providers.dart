@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/client_meter_record.dart';
 import '../services/meter_repository.dart';
 import '../services/excel_export_service.dart';
+import '../services/excel_import_service.dart';
 
 /// Repository singleton provider
 final meterRepositoryProvider = Provider<MeterRepository>((ref) {
@@ -22,15 +23,20 @@ class DuplicateClientNumberException implements Exception {
   String toString() => 'Ya existe un cliente con el N° $clientNumber';
 }
 
+/// Excel import service provider (overridable in tests)
+final excelImportServiceProvider = Provider<ExcelImportService>((ref) {
+  return ExcelImportService();
+});
+
 /// StateNotifier for managing client records
 class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
   final MeterRepository _repository;
 
   ClientRecordsNotifier(this._repository) : super([]);
 
-  /// Load all clients from the database
+  /// Load all clients from the database. Starts empty until a route is
+  /// imported or clients are added from the map.
   Future<void> loadClients() async {
-    await _repository.seedIfEmpty();
     state = await _repository.getAllClients();
   }
 
@@ -123,10 +129,12 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     state = await _repository.getAllClients();
   }
 
-  /// Clear and reseed (for dev / location change)
-  Future<void> resetAndReseed() async {
-    await _repository.resetAndReseed();
+  /// Replace the whole route with imported [records]; returns how many
+  /// clients were imported.
+  Future<int> importClients(List<ClientMeterRecord> records) async {
+    await _repository.replaceAllClients(records);
     state = await _repository.getAllClients();
+    return records.length;
   }
 }
 
