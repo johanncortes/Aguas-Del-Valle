@@ -258,7 +258,10 @@ void main() {
       expect(find.text('Confirmar Ubicación'), findsOneWidget);
 
       expect(find.byTooltip('Agregar cliente'), findsNothing);
+      expect(find.byTooltip('Centrar mapa'), findsNothing);
       expect(find.text('Exportar Excel'), findsNothing);
+      // Kept: helps when the reader is near the house
+      expect(find.byTooltip('Mi ubicación'), findsOneWidget);
       expect(find.text('Progreso de Ruta'), findsNothing);
       expect(find.byKey(const Key('unlocatedBanner')), findsNothing);
       await _unmount(tester);

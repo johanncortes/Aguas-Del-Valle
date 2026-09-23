@@ -225,7 +225,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   left: 0,
                   right: 0,
                   child: isPicking
-                      ? _buildLocationPickerPanel(pickingClient)
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            // Kept in picker mode: centers the map on the
+                            // reader when they are near the house.
+                            Padding(
+                              padding:
+                                  const EdgeInsets.only(right: 16, bottom: 12),
+                              child: _buildLocateMeButton(),
+                            ),
+                            _buildLocationPickerPanel(pickingClient),
+                          ],
+                        )
                       : Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -368,6 +381,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
+  /// Centers the map on the reader's GPS position.
+  Widget _buildLocateMeButton() {
+    return FloatingActionButton.small(
+      heroTag: 'locate_me',
+      tooltip: 'Mi ubicación',
+      onPressed: _locateMe,
+      backgroundColor: AppTheme.surface.withValues(alpha: 0.95),
+      child: const Icon(Icons.my_location,
+          size: 20, color: AppTheme.primaryLight),
+    );
+  }
+
   Widget _buildMapControls(List<ClientMeterRecord> clients) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -388,15 +413,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ),
         const SizedBox(height: 8),
-        // Locate me (user GPS) button
-        FloatingActionButton.small(
-          heroTag: 'locate_me',
-          tooltip: 'Mi ubicación',
-          onPressed: _locateMe,
-          backgroundColor: AppTheme.surface.withValues(alpha: 0.95),
-          child: const Icon(Icons.my_location,
-              size: 20, color: AppTheme.primaryLight),
-        ),
+        _buildLocateMeButton(),
         const SizedBox(height: 8),
         // Re-center on Sector Sol de las Praderas button
         FloatingActionButton.small(
