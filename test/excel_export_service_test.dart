@@ -26,6 +26,7 @@ ClientMeterRecord _client(
       readingLatitude: readingLat,
       readingLongitude: readingLng,
       photoPath: reading == 145 ? '/docs/evidence_photos/id-100_1.jpg' : null,
+      sector: 'Angostura',
     );
 
 /// Rows of the first sheet as display strings.
@@ -55,7 +56,8 @@ void main() {
     final rows = _rows(ExcelExportService().buildExcelBytes(route));
 
     expect(rows.first, [
-      'N° Cliente', 'Nombre Propietario', 'Latitud', 'Longitud', 'Estado',
+      'N° Cliente', 'Nombre Propietario', 'Sector', 'Latitud', 'Longitud',
+      'Estado',
       'Fecha/Hora Registro', 'Lectura Hace 2 Meses', 'Lectura Hace 1 Mes',
       'Lectura Actual', 'Consumo M3', 'Motivo No Lectura', 'Observaciones',
       'Latitud Lectura', 'Longitud Lectura', 'Foto',
@@ -64,17 +66,17 @@ void main() {
     expect(rows.skip(1).map((r) => r[0]), ['3', '4', '20', '100']);
 
     final read = rows.last;
-    expect(read.sublist(2, 5), ['-30.728', '-70.766', 'Leído']);
-    expect(read.sublist(8, 10), ['145', '25']);
-    expect(read.sublist(12), ['-30.7281', '-70.7662', 'id-100_1.jpg']);
+    expect(read.sublist(2, 6), ['Angostura', '-30.728', '-70.766', 'Leído']);
+    expect(read.sublist(9, 11), ['145', '25']);
+    expect(read.sublist(13), ['-30.7281', '-70.7662', 'id-100_1.jpg']);
 
     final pending = rows[3];
-    expect(pending[4], 'Pendiente');
-    expect(pending.sublist(8, 10), ['-', '-']);
-    expect(pending.sublist(12), ['-', '-', '']); // no GPS, no photo
+    expect(pending[5], 'Pendiente');
+    expect(pending.sublist(9, 11), ['-', '-']);
+    expect(pending.sublist(13), ['-', '-', '']); // no GPS, no photo
 
-    expect(rows[1].sublist(4, 5), ['Sin lectura']);
-    expect(rows[1][10], 'Perro');
+    expect(rows[1][5], 'Sin lectura');
+    expect(rows[1][11], 'Perro');
   });
 
   test('an exported file imports as next month\'s route', () {
@@ -103,6 +105,7 @@ void main() {
       expect(r.isVisited, isFalse);
       expect(r.currentReading, isNull);
       expect(r.readingLatitude, isNull);
+      expect(r.sector, 'Angostura'); // master data survives the round trip
     }
   });
 }

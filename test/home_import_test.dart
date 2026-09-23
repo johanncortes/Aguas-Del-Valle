@@ -64,7 +64,13 @@ Future<_FakeImportService> _pumpHome(
   WidgetTester tester, {
   List<ClientMeterRecord> clients = const [],
   Object? importResult,
+  Size? screen,
 }) async {
+  if (screen != null) {
+    tester.view.physicalSize = screen * 3;
+    tester.view.devicePixelRatio = 3;
+    addTearDown(tester.view.reset);
+  }
   PathProviderPlatform.instance = _FakePathProvider();
   await tester.runAsync(CachedTileProvider.initialize);
   final service = _FakeImportService(importResult);
@@ -161,4 +167,36 @@ void main() {
     expect(find.text('No hay clientes cargados'), findsNothing);
     await _unmount(tester);
   });
+
+  testWidgets('export button is hidden on an empty route', (tester) async {
+    await _pumpHome(tester);
+    expect(find.text('Exportar Excel'), findsNothing);
+    await _unmount(tester);
+  });
+
+  testWidgets('export button is shown when there are clients',
+      (tester) async {
+    await _pumpHome(tester, clients: [_client('a')]);
+    expect(find.text('Exportar Excel'), findsOneWidget);
+    await _unmount(tester);
+  });
+
+  for (final (name, screen) in [
+    ('iPhone SE', const Size(375, 667)),
+    ('iPhone 14', const Size(390, 844)),
+  ]) {
+    testWidgets('empty-route card does not overlap the map controls '
+        'on $name', (tester) async {
+      await _pumpHome(tester, screen: screen);
+
+      final card = tester.getRect(find.byKey(const Key('emptyRouteCard')));
+      for (final tooltip in ['Agregar cliente', 'Mi ubicación',
+          'Centrar mapa']) {
+        final control = tester.getRect(find.byTooltip(tooltip));
+        expect(card.overlaps(control), isFalse, reason: tooltip);
+      }
+      expect(tester.takeException(), isNull); // no overflow
+      await _unmount(tester);
+    });
+  }
 }

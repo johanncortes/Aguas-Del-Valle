@@ -50,9 +50,10 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     this._locationService = const LocationService(),
   ]) : super([]);
 
-  /// Load all clients from the database. Starts empty until a route is
-  /// imported or clients are added from the map.
+  /// Load all clients from the database. On first launch (empty
+  /// database) the official client list is loaded first.
   Future<void> loadClients() async {
+    await _repository.seedIfEmpty();
     state = await _repository.getAllClients();
   }
 
@@ -99,6 +100,7 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
       readingLatitude: position?.latitude,
       readingLongitude: position?.longitude,
       photoPath: photoPath,
+      sector: client.sector,
     );
 
     await _repository.saveClient(updated);

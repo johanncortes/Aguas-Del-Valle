@@ -60,6 +60,7 @@ void main() {
         readingLatitude: -30.7,
         readingLongitude: -70.7,
         photoPath: '/docs/evidence_photos/a.jpg',
+        sector: 'Varillar',
       ).startNewCycle();
 
       expect(next.readingTwoMonthsAgo, 120);
@@ -71,6 +72,7 @@ void main() {
       expect(next.readingLatitude, isNull);
       expect(next.readingLongitude, isNull);
       expect(next.photoPath, isNull);
+      expect(next.sector, 'Varillar'); // master data is kept
     });
 
     test('keeps history intact for a client that was not visited', () {
@@ -136,6 +138,7 @@ void main() {
         readingLatitude: -30.7296,
         readingLongitude: -70.7644,
         photoPath: '/docs/evidence_photos/a.jpg',
+        sector: 'Punta Blanca',
       ));
       await box.close();
 
@@ -147,6 +150,7 @@ void main() {
       expect(record.readingLatitude, -30.7296);
       expect(record.readingLongitude, -70.7644);
       expect(record.photoPath, '/docs/evidence_photos/a.jpg');
+      expect(record.sector, 'Punta Blanca');
     });
 
     test('reads records saved before the new fields existed', () async {
@@ -164,6 +168,7 @@ void main() {
       expect(record.readingLatitude, isNull);
       expect(record.readingLongitude, isNull);
       expect(record.photoPath, isNull);
+      expect(record.sector, isNull);
     });
   });
 }

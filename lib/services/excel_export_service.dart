@@ -22,6 +22,7 @@ class ExcelExportService {
   static final List<_ExportColumn> _columns = [
     _text('N° Cliente', 15, (r) => r.clientNumber),
     _text('Nombre Propietario', 35, (r) => r.ownerName, leftAligned: true),
+    _text('Sector', 20, (r) => r.sector ?? ''),
     _number('Latitud', 14, (r) => r.latitude),
     _number('Longitud', 14, (r) => r.longitude),
     _text('Estado', 14, (r) => switch (r.visitStatus) {

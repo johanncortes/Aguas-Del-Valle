@@ -26,6 +26,10 @@ class ClientMeterRecord {
   /// Local path of the evidence photo taken during the visit, if any.
   final String? photoPath;
 
+  /// Locality the client belongs to (e.g. "Angostura"). Master data: kept
+  /// across cycles, unlike the per-visit fields.
+  final String? sector;
+
   ClientMeterRecord({
     required this.id,
     required this.clientNumber,
@@ -42,6 +46,7 @@ class ClientMeterRecord {
     this.readingLatitude,
     this.readingLongitude,
     this.photoPath,
+    this.sector,
   });
 
   /// Calculated consumption in M3
@@ -89,6 +94,7 @@ class ClientMeterRecord {
       readingLatitude: null,
       readingLongitude: null,
       photoPath: null,
+      sector: sector,
     );
   }
 
@@ -108,6 +114,7 @@ class ClientMeterRecord {
     double? readingLatitude,
     double? readingLongitude,
     String? photoPath,
+    String? sector,
   }) {
     return ClientMeterRecord(
       id: id ?? this.id,
@@ -125,6 +132,7 @@ class ClientMeterRecord {
       readingLatitude: readingLatitude ?? this.readingLatitude,
       readingLongitude: readingLongitude ?? this.readingLongitude,
       photoPath: photoPath ?? this.photoPath,
+      sector: sector ?? this.sector,
     );
   }
 }
@@ -190,12 +198,13 @@ class ClientMeterRecordAdapter extends TypeAdapter<ClientMeterRecord> {
       readingLatitude: fields[12] as double?,
       readingLongitude: fields[13] as double?,
       photoPath: fields[14] as String?,
+      sector: fields[15] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ClientMeterRecord obj) {
-    writer.writeByte(15); // number of fields
+    writer.writeByte(16); // number of fields
     writer.writeByte(0);
     writer.write(obj.id);
     writer.writeByte(1);
@@ -226,5 +235,7 @@ class ClientMeterRecordAdapter extends TypeAdapter<ClientMeterRecord> {
     writer.write(obj.readingLongitude);
     writer.writeByte(14);
     writer.write(obj.photoPath);
+    writer.writeByte(15);
+    writer.write(obj.sector);
   }
 }

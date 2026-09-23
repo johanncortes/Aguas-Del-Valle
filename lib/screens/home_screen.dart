@@ -127,8 +127,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 _buildMap(clients),
 
                 // First run / empty route hint
+                // Above center, so it never meets the map controls that
+                // sit on top of the bottom panel.
                 if (clients.isEmpty)
-                  Center(child: _buildEmptyRouteCard(progress)),
+                  Align(
+                    alignment: const Alignment(0, -0.3),
+                    child: _buildEmptyRouteCard(progress),
+                  ),
 
                 // Top gradient overlay for status bar
                 Positioned(
@@ -176,76 +181,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     child: _buildRelocatingBanner(_relocatingClient!),
                   ),
 
-                // Bottom progress panel
+                // Map controls (bottom right, right above the panel) and
+                // the bottom progress panel
                 Positioned(
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  child: _buildBottomPanel(progress, clients),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.only(right: 16, bottom: 12),
+                        child: _buildMapControls(clients),
+                      ),
+                      _buildBottomPanel(progress, clients),
+                    ],
+                  ),
                 ),
               ],
             ),
-      floatingActionButton: _isLoading
-          ? null
-          : Padding(
-              padding: const EdgeInsets.only(bottom: 160),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Add client pin button
-                  FloatingActionButton.small(
-                    heroTag: 'add_pin',
-                    onPressed: _toggleAddPinMode,
-                    backgroundColor: _isAddPinMode
-                        ? AppTheme.warningAmber
-                        : AppTheme.surface.withValues(alpha: 0.9),
-                    child: Icon(
-                      _isAddPinMode ? Icons.close : Icons.add_location_alt,
-                      size: 20,
-                      color: _isAddPinMode ? Colors.white : AppTheme.accentCyan,
+    );
+  }
+
+  Widget _buildMapControls(List<ClientMeterRecord> clients) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        // Add client pin button
+        FloatingActionButton.small(
+          heroTag: 'add_pin',
+          tooltip: 'Agregar cliente',
+          onPressed: _toggleAddPinMode,
+          backgroundColor: _isAddPinMode
+              ? AppTheme.warningAmber
+              : AppTheme.surface.withValues(alpha: 0.95),
+          child: Icon(
+            _isAddPinMode ? Icons.close : Icons.add_location_alt,
+            size: 20,
+            color: _isAddPinMode ? Colors.white : AppTheme.accentCyan,
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Locate me (user GPS) button
+        FloatingActionButton.small(
+          heroTag: 'locate_me',
+          tooltip: 'Mi ubicación',
+          onPressed: _locateMe,
+          backgroundColor: AppTheme.surface.withValues(alpha: 0.95),
+          child: const Icon(Icons.my_location,
+              size: 20, color: AppTheme.primaryLight),
+        ),
+        const SizedBox(height: 8),
+        // Re-center on Sector Sol de las Praderas button
+        FloatingActionButton.small(
+          heroTag: 'center_map',
+          tooltip: 'Centrar mapa',
+          onPressed: _centerMap,
+          backgroundColor: AppTheme.surface.withValues(alpha: 0.95),
+          child: const Icon(Icons.explore_outlined,
+              size: 20, color: AppTheme.textPrimary),
+        ),
+        // Export button: nothing to export on an empty route
+        if (clients.isNotEmpty) ...[
+          const SizedBox(height: 10),
+          FloatingActionButton.extended(
+            heroTag: 'export_excel',
+            onPressed: _isExporting ? null : () => _exportToExcel(clients),
+            icon: _isExporting
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  // Locate me (user GPS) button
-                  FloatingActionButton.small(
-                    heroTag: 'locate_me',
-                    onPressed: _locateMe,
-                    backgroundColor: AppTheme.surface.withValues(alpha: 0.9),
-                    child: const Icon(Icons.my_location,
-                        size: 20, color: AppTheme.primaryLight),
-                  ),
-                  const SizedBox(height: 10),
-                  // Re-center on Sector Sol de las Praderas button
-                  FloatingActionButton.small(
-                    heroTag: 'center_map',
-                    onPressed: _centerMap,
-                    backgroundColor: AppTheme.surface.withValues(alpha: 0.9),
-                    child: const Icon(Icons.explore_outlined,
-                        size: 20, color: AppTheme.textPrimary),
-                  ),
-                  const SizedBox(height: 10),
-                  // Export button
-                  FloatingActionButton.extended(
-                    heroTag: 'export_excel',
-                    onPressed: _isExporting ? null : () => _exportToExcel(clients),
-                    icon: _isExporting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
-                        : const Icon(Icons.file_download_outlined),
-                    label: Text(
-                      _isExporting ? 'Exportando...' : 'Exportar Excel',
-                      style: AppFonts.text(fontWeight: FontWeight.w600),
-                    ),
-                  ),
-                ],
-              ),
+                  )
+                : const Icon(Icons.file_download_outlined),
+            label: Text(
+              _isExporting ? 'Exportando...' : 'Exportar Excel',
+              style: AppFonts.text(fontWeight: FontWeight.w600),
             ),
+          ),
+        ],
+      ],
     );
   }
 
@@ -728,9 +748,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildEmptyRouteCard(RouteProgress progress) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 32),
-      padding: const EdgeInsets.all(20),
+    // 64 px side margins keep the card clear of the map controls column
+    // (16 px margin + 40 px buttons) whatever its height.
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 64),
+      child: Container(
+      key: const Key('emptyRouteCard'),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         color: AppTheme.background.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(20),
@@ -739,36 +763,46 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.route, size: 40, color: AppTheme.accentCyan),
-          const SizedBox(height: 12),
+          const Icon(Icons.route, size: 28, color: AppTheme.accentCyan),
+          const SizedBox(height: 6),
           Text(
             'No hay clientes cargados',
             textAlign: TextAlign.center,
             style: AppFonts.text(
-              fontSize: 17,
+              fontSize: 16,
               fontWeight: FontWeight.w700,
               color: AppTheme.textPrimary,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           Text(
             'Importa la ruta del mes desde un Excel, o mantén presionado '
             'el mapa para agregar un cliente.',
             textAlign: TextAlign.center,
-            style: AppFonts.text(fontSize: 13, color: AppTheme.textSecondary),
+            style: AppFonts.text(
+              fontSize: 12.5,
+              height: 1.3,
+              color: AppTheme.textSecondary,
+            ),
           ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: _isImporting ? null : () => _importRoute(progress),
-            icon: const Icon(Icons.upload_file),
-            label: const Text('Importar Ruta (Excel)'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.primaryLight,
-              foregroundColor: Colors.white,
+          const SizedBox(height: 12),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: ElevatedButton.icon(
+              onPressed: _isImporting ? null : () => _importRoute(progress),
+              icon: const Icon(Icons.upload_file, size: 20),
+              label: const Text('Importar Ruta (Excel)'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.primaryLight,
+                foregroundColor: Colors.white,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
             ),
           ),
         ],
       ),
+    ),
     );
   }
 
@@ -1396,7 +1430,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   ) {
     return Container(
       padding: EdgeInsets.fromLTRB(
-          20, 20, 20, MediaQuery.of(context).padding.bottom + 16),
+          16, 12, 16, MediaQuery.of(context).padding.bottom + 8),
       decoration: BoxDecoration(
         color: AppTheme.background.withValues(alpha: 0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
@@ -1441,13 +1475,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 8),
           // Animated progress bar
           ClipRRect(
             borderRadius: BorderRadius.circular(6),
             child: LinearProgressIndicator(
               value: progress.percent / 100,
-              minHeight: 8,
+              minHeight: 6,
               backgroundColor: AppTheme.surfaceVariant,
               valueColor: AlwaysStoppedAnimation<Color>(
                 progress.percent == 100
@@ -1456,7 +1490,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               ),
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           // Stats row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -1509,7 +1543,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             Text(
               value,
               style: AppFonts.text(
-                fontSize: 20,
+                fontSize: 18,
                 fontWeight: FontWeight.w800,
                 color: color,
               ),
