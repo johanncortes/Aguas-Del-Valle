@@ -34,6 +34,18 @@ título arriba) con estas columnas, en cualquier orden:
 | Lectura Mes Anterior | 1268 | Entero ≥ 0; vacío = 0 |
 | Lectura 2 Meses Atrás | 1245 | Entero ≥ 0; vacío = 0; no mayor que la del mes anterior |
 
+### Usar el Excel exportado como ruta del mes siguiente
+
+El botón **Exportar Excel** genera un archivo con todos los clientes
+(también los pendientes), sus coordenadas y la columna "Lectura Actual".
+Ese mismo archivo se puede importar el mes siguiente: para cada cliente
+con lectura, la "Lectura Actual" pasa a ser la "Lectura Mes Anterior";
+los clientes sin lectura conservan su historial (igual que "Cerrar mes").
+
+Las columnas "Latitud Lectura" y "Longitud Lectura" indican dónde estaba el
+teléfono al registrar la visita (auditoría GPS). Quedan en "-" si no había
+GPS o permiso de ubicación; la lectura se guarda igual.
+
 También se aceptan variantes como "Nro. Cliente", "Nombre Propietario",
 "Lectura Hace 1 Mes" o "Lectura Hace 2 Meses" (sin importar mayúsculas ni
 tildes). Si alguna fila tiene errores no se importa nada y la app muestra

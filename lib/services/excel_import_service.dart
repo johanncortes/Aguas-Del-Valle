@@ -37,6 +37,11 @@ enum _Column {
   final List<String> aliases;
 }
 
+/// Optional "Lectura Actual" column, present in files exported by the app.
+/// When a row has a value there, the route is rolled over to the next
+/// month on import (same rule as closing the month in the app).
+const _currentReadingAliases = ['lectura actual'];
+
 /// Reads the monthly route (list of clients) from an .xlsx file.
 class ExcelImportService {
   static const _uuid = Uuid();
@@ -81,7 +86,12 @@ class ExcelImportService {
       final rows = sheet.rows;
       final header = _findHeader(rows);
       if (header != null) {
-        return _parseRows(rows, header.rowIndex, header.columns);
+        return _parseRows(
+          rows,
+          header.rowIndex,
+          header.columns,
+          _findColumn(rows[header.rowIndex], _currentReadingAliases),
+        );
       }
     }
 
@@ -128,10 +138,20 @@ class ExcelImportService {
     return null;
   }
 
+  static int? _findColumn(List<Data?> headerRow, List<String> aliases) {
+    for (var c = 0; c < headerRow.length; c++) {
+      if (aliases.contains(_normalizeHeader(_cellText(headerRow[c])))) {
+        return c;
+      }
+    }
+    return null;
+  }
+
   List<ClientMeterRecord> _parseRows(
     List<List<Data?>> rows,
     int headerRow,
     Map<_Column, int> columns,
+    int? currentReadingColumn,
   ) {
     final records = <ClientMeterRecord>[];
     final errors = <String>[];
@@ -154,8 +174,20 @@ class ExcelImportService {
       final ownerName = _cellText(cell(_Column.ownerName));
       final latitude = _cellNumber(cell(_Column.latitude));
       final longitude = _cellNumber(cell(_Column.longitude));
-      final oneMonth = _cellReading(cell(_Column.readingOneMonthAgo));
-      final twoMonths = _cellReading(cell(_Column.readingTwoMonthsAgo));
+      var oneMonth = _cellReading(cell(_Column.readingOneMonthAgo));
+      var twoMonths = _cellReading(cell(_Column.readingTwoMonthsAgo));
+
+      // Exported files carry this month's reading: roll it into the
+      // history. "-" or empty means the client was not read; its
+      // history is kept as is.
+      final currentCell =
+          currentReadingColumn != null && currentReadingColumn < row.length
+              ? row[currentReadingColumn]
+              : null;
+      final currentText = _cellText(currentCell);
+      final hasCurrentReading = currentText.isNotEmpty && currentText != '-';
+      final currentReading =
+          hasCurrentReading ? _cellReading(currentCell) : null;
 
       if (clientNumber.isEmpty) rowErrors.add('falta el N° de cliente');
       if (ownerName.isEmpty) rowErrors.add('falta el nombre');
@@ -167,7 +199,17 @@ class ExcelImportService {
       }
       if (oneMonth == null) rowErrors.add('lectura mes anterior inválida');
       if (twoMonths == null) rowErrors.add('lectura 2 meses atrás inválida');
-      if (oneMonth != null && twoMonths != null && oneMonth < twoMonths) {
+      if (hasCurrentReading && currentReading == null) {
+        rowErrors.add('lectura actual inválida');
+      }
+      if (currentReading != null && oneMonth != null) {
+        // A lower reading here was already confirmed by the reader in the
+        // app (typo check or meter rollover), so it isn't rejected.
+        twoMonths = oneMonth;
+        oneMonth = currentReading;
+      } else if (oneMonth != null &&
+          twoMonths != null &&
+          oneMonth < twoMonths) {
         rowErrors.add('la lectura del mes anterior es menor que la de '
             '2 meses atrás');
       }

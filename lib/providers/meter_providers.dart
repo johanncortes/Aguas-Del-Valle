@@ -3,6 +3,7 @@ import '../models/client_meter_record.dart';
 import '../services/meter_repository.dart';
 import '../services/excel_export_service.dart';
 import '../services/excel_import_service.dart';
+import '../services/location_service.dart';
 
 /// Repository singleton provider
 final meterRepositoryProvider = Provider<MeterRepository>((ref) {
@@ -28,11 +29,20 @@ final excelImportServiceProvider = Provider<ExcelImportService>((ref) {
   return ExcelImportService();
 });
 
+/// Device location for the GPS audit of visits (overridable in tests)
+final locationServiceProvider = Provider<LocationService>((ref) {
+  return const LocationService();
+});
+
 /// StateNotifier for managing client records
 class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
   final MeterRepository _repository;
+  final LocationService _locationService;
 
-  ClientRecordsNotifier(this._repository) : super([]);
+  ClientRecordsNotifier(
+    this._repository, [
+    this._locationService = const LocationService(),
+  ]) : super([]);
 
   /// Load all clients from the database. Starts empty until a route is
   /// imported or clients are added from the map.
@@ -43,7 +53,11 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
   /// Record the result of a visit: either a [reading] or a
   /// [nonReadingReason] (exactly one of them), plus optional [observations].
   /// Saving one clears the other, so a record never holds both.
-  Future<void> saveReading(
+  ///
+  /// Also stores where the device was (GPS audit). Without location the
+  /// visit is still saved, with null coordinates: the reader's work is
+  /// never blocked by GPS. Returns the saved record.
+  Future<ClientMeterRecord?> saveReading(
     String clientId, {
     int? reading,
     String? nonReadingReason,
@@ -55,8 +69,9 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     }
 
     final client = await _repository.getClient(clientId);
-    if (client == null) return;
+    if (client == null) return null;
 
+    final position = await _locationService.currentPosition();
     final trimmedObservations = observations?.trim();
     final updated = ClientMeterRecord(
       id: client.id,
@@ -73,10 +88,13 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
       observations: (trimmedObservations == null || trimmedObservations.isEmpty)
           ? null
           : trimmedObservations,
+      readingLatitude: position?.latitude,
+      readingLongitude: position?.longitude,
     );
 
     await _repository.saveClient(updated);
     state = await _repository.getAllClients();
+    return updated;
   }
 
   /// Whether [clientNumber] is already used by a client other than
@@ -142,7 +160,7 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
 final clientRecordsProvider =
     StateNotifierProvider<ClientRecordsNotifier, List<ClientMeterRecord>>((ref) {
   final repository = ref.watch(meterRepositoryProvider);
-  return ClientRecordsNotifier(repository);
+  return ClientRecordsNotifier(repository, ref.watch(locationServiceProvider));
 });
 
 /// Route progress for the current cycle. [visited] = [read] + [noReading].

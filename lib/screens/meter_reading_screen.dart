@@ -703,13 +703,28 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
           shadowColor: AppTheme.visitedGreen.withValues(alpha: 0.4),
         ),
         child: _isSaving
-            ? const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: Colors.white,
-                ),
+            // Saving waits for a GPS fix (up to a few seconds)
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Obteniendo ubicación...',
+                    style: AppFonts.text(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
               )
             : Row(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -745,7 +760,7 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
     setState(() => _isSaving = true);
 
     try {
-      await ref.read(clientRecordsProvider.notifier).saveReading(
+      final saved = await ref.read(clientRecordsProvider.notifier).saveReading(
             client.id,
             reading: reading,
             nonReadingReason: reason?.label,
@@ -761,9 +776,12 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    reason == null
-                        ? 'Lectura guardada para ${client.ownerName}'
-                        : 'Visita registrada sin lectura: ${reason.label}',
+                    (reason == null
+                            ? 'Lectura guardada para ${client.ownerName}'
+                            : 'Visita registrada sin lectura: ${reason.label}') +
+                        (saved != null && saved.readingLatitude == null
+                            ? ' (sin ubicación GPS)'
+                            : ''),
                     style: AppFonts.text(fontWeight: FontWeight.w500),
                   ),
                 ),

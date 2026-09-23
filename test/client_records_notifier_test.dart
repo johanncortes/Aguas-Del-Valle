@@ -5,6 +5,15 @@ import 'package:hive/hive.dart';
 import 'package:aguas_monte_patria/models/client_meter_record.dart';
 import 'package:aguas_monte_patria/providers/meter_providers.dart';
 import 'package:aguas_monte_patria/services/meter_repository.dart';
+import 'package:aguas_monte_patria/services/location_service.dart';
+
+class _FakeLocationService extends LocationService {
+  _FakeLocationService(this.position);
+  DevicePosition? position;
+
+  @override
+  Future<DevicePosition?> currentPosition() async => position;
+}
 
 ClientMeterRecord _client(String id, String number) => ClientMeterRecord(
       id: id,
@@ -19,12 +28,14 @@ ClientMeterRecord _client(String id, String number) => ClientMeterRecord(
 void main() {
   late Directory dir;
   late ClientRecordsNotifier notifier;
+  late _FakeLocationService location;
 
   setUp(() async {
     dir = await Directory.systemTemp.createTemp('hive_notifier_test');
     Hive.init(dir.path);
     Hive.registerAdapter(ClientMeterRecordAdapter(), override: true);
-    notifier = ClientRecordsNotifier(MeterRepository());
+    location = _FakeLocationService((latitude: -30.7296, longitude: -70.7644));
+    notifier = ClientRecordsNotifier(MeterRepository(), location);
     await notifier.importClients([
       _client('sp-001', '40225001'),
       _client('sp-002', '40225002'),
@@ -128,6 +139,38 @@ void main() {
       await reloaded.loadClients();
       expect(reloaded.state.map((c) => c.clientNumber),
           unorderedEquals(['50000001', '50000002']));
+    });
+  });
+
+  group('GPS audit', () {
+    test('stores where the device was when saving', () async {
+      final saved = await notifier.saveReading('sp-001', reading: 1300);
+
+      expect(saved?.readingLatitude, -30.7296);
+      expect(saved?.readingLongitude, -70.7644);
+      expect(record('sp-001').readingLatitude, -30.7296);
+    });
+
+    test('saves anyway without location (never blocks the reader)',
+        () async {
+      location.position = null;
+
+      final saved = await notifier.saveReading('sp-001',
+          nonReadingReason: 'Casa cerrada');
+
+      expect(saved?.isVisited, isTrue);
+      expect(record('sp-001').nonReadingReason, 'Casa cerrada');
+      expect(record('sp-001').readingLatitude, isNull);
+      expect(record('sp-001').readingLongitude, isNull);
+    });
+
+    test('a new save without location clears the previous position',
+        () async {
+      await notifier.saveReading('sp-001', reading: 1300);
+      location.position = null;
+      await notifier.saveReading('sp-001', reading: 1301);
+
+      expect(record('sp-001').readingLatitude, isNull);
     });
   });
 }

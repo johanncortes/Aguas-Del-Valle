@@ -20,8 +20,11 @@ class _FakeClientRecordsNotifier extends ClientRecordsNotifier {
 
   final saves = <_SaveCall>[];
 
+  /// What saveReading returns (the saved record in the real notifier).
+  ClientMeterRecord? savedRecord;
+
   @override
-  Future<void> saveReading(
+  Future<ClientMeterRecord?> saveReading(
     String clientId, {
     int? reading,
     String? nonReadingReason,
@@ -32,6 +35,7 @@ class _FakeClientRecordsNotifier extends ClientRecordsNotifier {
       nonReadingReason: nonReadingReason,
       observations: observations,
     ));
+    return savedRecord;
   }
 }
 
@@ -42,15 +46,18 @@ Future<_FakeClientRecordsNotifier> _openScreen(
   await tester.pumpWidget(ProviderScope(
     overrides: [clientRecordsProvider.overrideWith((ref) => notifier)],
     child: MaterialApp(
-      home: Builder(
-        builder: (context) => ElevatedButton(
-          onPressed: () => Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => MeterReadingScreen(clientId: client.id),
+      // Scaffold so the post-save SnackBar can show after popping back
+      home: Scaffold(
+        body: Builder(
+          builder: (context) => ElevatedButton(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => MeterReadingScreen(clientId: client.id),
+              ),
             ),
+            child: const Text('open'),
           ),
-          child: const Text('open'),
         ),
       ),
     ),
@@ -191,5 +198,28 @@ void main() {
 
     expect(find.text('No se pudo leer: Casa cerrada'), findsOneWidget);
     expect(_readingField, findsNothing);
+  });
+
+  testWidgets('tells the reader when the visit was saved without GPS',
+      (tester) async {
+    final notifier = await _openScreen(tester, client());
+    notifier.savedRecord = client(currentReading: 140); // no coordinates
+
+    await tester.enterText(_readingField, '140');
+    await _tapSave(tester);
+
+    expect(find.textContaining('(sin ubicación GPS)'), findsOneWidget);
+  });
+
+  testWidgets('no GPS notice when the position was captured', (tester) async {
+    final notifier = await _openScreen(tester, client());
+    notifier.savedRecord = client(currentReading: 140)
+        .copyWith(readingLatitude: -30.7, readingLongitude: -70.7);
+
+    await tester.enterText(_readingField, '140');
+    await _tapSave(tester);
+
+    expect(find.textContaining('Lectura guardada'), findsOneWidget);
+    expect(find.textContaining('(sin ubicación GPS)'), findsNothing);
   });
 }

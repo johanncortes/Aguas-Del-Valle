@@ -1547,8 +1547,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _exportToExcel(List<ClientMeterRecord> clients) async {
-    final visitedCount = clients.where((c) => c.isVisited).length;
-    if (visitedCount == 0) {
+    if (clients.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1557,7 +1556,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 const Icon(Icons.info_outline, color: AppTheme.warningAmber),
                 const SizedBox(width: 12),
                 Text(
-                  'No hay lecturas registradas para exportar',
+                  'No hay clientes para exportar',
                   style: AppFonts.text(),
                 ),
               ],
