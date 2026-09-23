@@ -11,7 +11,9 @@ import '../providers/meter_providers.dart';
 import '../services/cached_tile_provider.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
+import '../theme/visit_status_style.dart';
 import 'add_client_modal.dart';
+import 'client_list_screen.dart';
 import 'meter_reading_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -323,7 +325,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildHeaderBar(({int total, int visited, double percent}) progress) {
+  Widget _buildHeaderBar(RouteProgress progress) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
@@ -362,6 +364,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               children: [
                 Text(
                   'Aguas del Valle',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -370,6 +374,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
                 Text(
                   'Sol de las Praderas • Ruta del día',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.inter(
                     fontSize: 12,
                     color: AppTheme.textSecondary,
@@ -404,13 +410,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             ),
           ),
           const SizedBox(width: 4),
+          IconButton(
+            tooltip: 'Lista de clientes',
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(Icons.format_list_bulleted,
+                color: AppTheme.textSecondary),
+            onPressed: _openClientList,
+          ),
           _buildHeaderMenu(progress),
         ],
       ),
     );
   }
 
-  Widget _buildHeaderMenu(({int total, int visited, double percent}) progress) {
+  Widget _buildHeaderMenu(RouteProgress progress) {
     return PopupMenuButton<_HeaderMenuAction>(
       tooltip: 'Opciones',
       icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary),
@@ -460,7 +473,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Future<void> _confirmCloseCycle(
-      ({int total, int visited, double percent}) progress) async {
+      RouteProgress progress) async {
     final pending = progress.total - progress.visited;
 
     final confirmed = await showDialog<bool>(
@@ -1187,7 +1200,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Widget _buildBottomPanel(
-    ({int total, int visited, double percent}) progress,
+    RouteProgress progress,
     List<ClientMeterRecord> clients,
   ) {
     return Container(
@@ -1215,15 +1228,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           // Progress bar
           Row(
             children: [
-              Text(
-                'Progreso de Ruta',
-                style: GoogleFonts.inter(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
+              Expanded(
+                child: Text(
+                  'Progreso de Ruta',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: GoogleFonts.inter(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
                 ),
               ),
-              const Spacer(),
               Text(
                 '${progress.percent.toStringAsFixed(0)}%',
                 style: GoogleFonts.inter(
@@ -1255,16 +1271,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildStatItem(
-                Icons.pending_outlined,
+                VisitStatus.pending.badgeIcon,
                 '${progress.total - progress.visited}',
                 'Pendientes',
-                AppTheme.pendingRed,
+                VisitStatus.pending.color,
               ),
               _buildStatItem(
-                Icons.check_circle_outline,
-                '${progress.visited}',
-                'Visitados',
-                AppTheme.visitedGreen,
+                VisitStatus.read.badgeIcon,
+                '${progress.read}',
+                'Leídos',
+                VisitStatus.read.color,
+              ),
+              _buildStatItem(
+                VisitStatus.noReading.badgeIcon,
+                '${progress.noReading}',
+                'Sin lectura',
+                VisitStatus.noReading.color,
               ),
               _buildStatItem(
                 Icons.group_outlined,
@@ -1281,7 +1303,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
   Widget _buildStatItem(
       IconData icon, String value, String label, Color color) {
-    return Column(
+    // Four items share the row: each gets an equal slot and scales down
+    // instead of overflowing on narrow screens or large text settings.
+    return Expanded(
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Column(
       children: [
         Row(
           mainAxisSize: MainAxisSize.min,
@@ -1307,6 +1334,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ),
       ],
+        ),
+      ),
+    );
+  }
+
+  void _openClientList() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ClientListScreen()),
     );
   }
 
@@ -1401,33 +1437,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 }
 
 enum _HeaderMenuAction { closeCycle, reseed }
-
-/// Map pin and badge styling for each visit outcome.
-extension _VisitStatusStyle on VisitStatus {
-  Color get color => switch (this) {
-        VisitStatus.pending => AppTheme.pendingRed,
-        VisitStatus.read => AppTheme.visitedGreen,
-        VisitStatus.noReading => AppTheme.noReadingOrange,
-      };
-
-  IconData get pinIcon => switch (this) {
-        VisitStatus.pending => Icons.water_drop,
-        VisitStatus.read => Icons.check,
-        VisitStatus.noReading => Icons.priority_high,
-      };
-
-  IconData get badgeIcon => switch (this) {
-        VisitStatus.pending => Icons.pending_outlined,
-        VisitStatus.read => Icons.check_circle,
-        VisitStatus.noReading => Icons.report_problem_outlined,
-      };
-
-  String get label => switch (this) {
-        VisitStatus.pending => 'Pendiente',
-        VisitStatus.read => 'Visitado',
-        VisitStatus.noReading => 'Sin lectura',
-      };
-}
 
 /// Custom painter for the triangular pin tail
 class _PinTailPainter extends CustomPainter {

@@ -136,7 +136,8 @@ class MeterRepository {
     await box.put(record.id, record);
   }
 
-  /// Create a new client dynamically from map pin drop
+  /// Create a new client dynamically from map pin drop. New clients start
+  /// pending; their first reading is taken from the reading screen.
   Future<ClientMeterRecord> createClient({
     required String ownerName,
     required String clientNumber,
@@ -144,10 +145,8 @@ class MeterRepository {
     required double longitude,
     int readingTwoMonthsAgo = 0,
     int readingOneMonthAgo = 0,
-    int? currentReading,
   }) async {
     final id = 'dyn-${_uuid.v4().substring(0, 8)}';
-    final hasReading = currentReading != null;
 
     final record = ClientMeterRecord(
       id: id,
@@ -155,11 +154,8 @@ class MeterRepository {
       ownerName: ownerName,
       readingTwoMonthsAgo: readingTwoMonthsAgo,
       readingOneMonthAgo: readingOneMonthAgo,
-      currentReading: currentReading,
-      isVisited: hasReading,
       latitude: latitude,
       longitude: longitude,
-      updatedAt: hasReading ? DateTime.now() : null,
     );
 
     final box = await _getBox();

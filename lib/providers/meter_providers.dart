@@ -89,7 +89,6 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     required double longitude,
     int readingTwoMonthsAgo = 0,
     int readingOneMonthAgo = 0,
-    int? currentReading,
   }) async {
     if (isClientNumberTaken(clientNumber)) {
       throw DuplicateClientNumberException(clientNumber.trim());
@@ -101,7 +100,6 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
       longitude: longitude,
       readingTwoMonthsAgo: readingTwoMonthsAgo,
       readingOneMonthAgo: readingOneMonthAgo,
-      currentReading: currentReading,
     );
     state = await _repository.getAllClients();
     return record;
@@ -139,11 +137,30 @@ final clientRecordsProvider =
   return ClientRecordsNotifier(repository);
 });
 
+/// Route progress for the current cycle. [visited] = [read] + [noReading].
+typedef RouteProgress = ({
+  int total,
+  int visited,
+  int read,
+  int noReading,
+  double percent,
+});
+
 /// Derived provider: progress stats
-final routeProgressProvider = Provider<({int total, int visited, double percent})>((ref) {
+final routeProgressProvider = Provider<RouteProgress>((ref) {
   final records = ref.watch(clientRecordsProvider);
   final total = records.length;
-  final visited = records.where((r) => r.isVisited).length;
+  final read =
+      records.where((r) => r.visitStatus == VisitStatus.read).length;
+  final noReading =
+      records.where((r) => r.visitStatus == VisitStatus.noReading).length;
+  final visited = read + noReading;
   final percent = total > 0 ? (visited / total) * 100 : 0.0;
-  return (total: total, visited: visited, percent: percent);
+  return (
+    total: total,
+    visited: visited,
+    read: read,
+    noReading: noReading,
+    percent: percent,
+  );
 });

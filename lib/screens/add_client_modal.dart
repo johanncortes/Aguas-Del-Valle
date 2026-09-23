@@ -22,7 +22,6 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
   final _clientNumberController = TextEditingController();
   final _reading2MonthsController = TextEditingController(text: '0');
   final _reading1MonthController = TextEditingController(text: '0');
-  final _currentReadingController = TextEditingController();
   bool _isSaving = false;
 
   @override
@@ -31,7 +30,6 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
     _clientNumberController.dispose();
     _reading2MonthsController.dispose();
     _reading1MonthController.dispose();
-    _currentReadingController.dispose();
     super.dispose();
   }
 
@@ -258,35 +256,6 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-
-                // Current reading (optional)
-                _buildLabel('Lectura Actual del Medidor (opcional)'),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: _currentReadingController,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: GoogleFonts.inter(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
-                    letterSpacing: 1,
-                  ),
-                  textAlign: TextAlign.center,
-                  decoration: InputDecoration(
-                    hintText: 'Dejar vacío si no hay lectura',
-                    hintStyle: GoogleFonts.inter(
-                      fontSize: 13,
-                      color: AppTheme.textSecondary.withValues(alpha: 0.4),
-                    ),
-                    suffixText: 'm³',
-                    suffixStyle: GoogleFonts.inter(
-                      fontSize: 14,
-                      color: AppTheme.textSecondary,
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 24),
 
                 // Buttons row
@@ -371,10 +340,6 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
     setState(() => _isSaving = true);
 
     try {
-      final currentReadingText = _currentReadingController.text.trim();
-      final currentReading =
-          currentReadingText.isEmpty ? null : int.tryParse(currentReadingText);
-
       await ref.read(clientRecordsProvider.notifier).addClient(
             ownerName: _nameController.text.trim(),
             clientNumber: _clientNumberController.text.trim(),
@@ -382,7 +347,6 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
             longitude: widget.location.longitude,
             readingTwoMonthsAgo: _parseReading(_reading2MonthsController.text),
             readingOneMonthAgo: _parseReading(_reading1MonthController.text),
-            currentReading: currentReading,
           );
 
       if (mounted) {
