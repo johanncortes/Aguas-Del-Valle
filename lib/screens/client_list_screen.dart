@@ -30,9 +30,9 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen> {
     final clients = ref.watch(filteredClientsProvider);
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceDark,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppTheme.background,
         title: Text(
           'Clientes',
           style: AppFonts.text(fontWeight: FontWeight.w700),
@@ -121,7 +121,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen> {
                 fontWeight: FontWeight.w600,
                 color: AppTheme.textPrimary,
               ),
-              backgroundColor: AppTheme.surfaceCard,
+              backgroundColor: AppTheme.surface,
               selectedColor: (status?.color ?? AppTheme.accentCyan)
                   .withValues(alpha: 0.3),
               onSelected: (_) => ref
@@ -143,7 +143,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen> {
     };
 
     return Material(
-      color: AppTheme.surfaceCard,
+      color: AppTheme.surface,
       borderRadius: BorderRadius.circular(16),
       child: ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

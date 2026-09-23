@@ -23,6 +23,9 @@ class ClientMeterRecord {
   final double? readingLatitude;
   final double? readingLongitude;
 
+  /// Local path of the evidence photo taken during the visit, if any.
+  final String? photoPath;
+
   ClientMeterRecord({
     required this.id,
     required this.clientNumber,
@@ -38,6 +41,7 @@ class ClientMeterRecord {
     this.observations,
     this.readingLatitude,
     this.readingLongitude,
+    this.photoPath,
   });
 
   /// Calculated consumption in M3
@@ -84,6 +88,7 @@ class ClientMeterRecord {
       observations: null,
       readingLatitude: null,
       readingLongitude: null,
+      photoPath: null,
     );
   }
 
@@ -102,6 +107,7 @@ class ClientMeterRecord {
     String? observations,
     double? readingLatitude,
     double? readingLongitude,
+    String? photoPath,
   }) {
     return ClientMeterRecord(
       id: id ?? this.id,
@@ -118,6 +124,7 @@ class ClientMeterRecord {
       observations: observations ?? this.observations,
       readingLatitude: readingLatitude ?? this.readingLatitude,
       readingLongitude: readingLongitude ?? this.readingLongitude,
+      photoPath: photoPath ?? this.photoPath,
     );
   }
 }
@@ -182,12 +189,13 @@ class ClientMeterRecordAdapter extends TypeAdapter<ClientMeterRecord> {
       observations: fields[11] as String?,
       readingLatitude: fields[12] as double?,
       readingLongitude: fields[13] as double?,
+      photoPath: fields[14] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ClientMeterRecord obj) {
-    writer.writeByte(14); // number of fields
+    writer.writeByte(15); // number of fields
     writer.writeByte(0);
     writer.write(obj.id);
     writer.writeByte(1);
@@ -216,5 +224,7 @@ class ClientMeterRecordAdapter extends TypeAdapter<ClientMeterRecord> {
     writer.write(obj.readingLatitude);
     writer.writeByte(13);
     writer.write(obj.readingLongitude);
+    writer.writeByte(14);
+    writer.write(obj.photoPath);
   }
 }

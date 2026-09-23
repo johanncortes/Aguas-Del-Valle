@@ -25,6 +25,7 @@ ClientMeterRecord _client(
       nonReadingReason: reason,
       readingLatitude: readingLat,
       readingLongitude: readingLng,
+      photoPath: reading == 145 ? '/docs/evidence_photos/id-100_1.jpg' : null,
     );
 
 /// Rows of the first sheet as display strings.
@@ -57,7 +58,7 @@ void main() {
       'N° Cliente', 'Nombre Propietario', 'Latitud', 'Longitud', 'Estado',
       'Fecha/Hora Registro', 'Lectura Hace 2 Meses', 'Lectura Hace 1 Mes',
       'Lectura Actual', 'Consumo M3', 'Motivo No Lectura', 'Observaciones',
-      'Latitud Lectura', 'Longitud Lectura',
+      'Latitud Lectura', 'Longitud Lectura', 'Foto',
     ]);
     // All clients, including pending, in numeric client-number order
     expect(rows.skip(1).map((r) => r[0]), ['3', '4', '20', '100']);
@@ -65,12 +66,12 @@ void main() {
     final read = rows.last;
     expect(read.sublist(2, 5), ['-30.728', '-70.766', 'Leído']);
     expect(read.sublist(8, 10), ['145', '25']);
-    expect(read.sublist(12), ['-30.7281', '-70.7662']);
+    expect(read.sublist(12), ['-30.7281', '-70.7662', 'id-100_1.jpg']);
 
     final pending = rows[3];
     expect(pending[4], 'Pendiente');
     expect(pending.sublist(8, 10), ['-', '-']);
-    expect(pending.sublist(12), ['-', '-']); // no GPS captured
+    expect(pending.sublist(12), ['-', '-', '']); // no GPS, no photo
 
     expect(rows[1].sublist(4, 5), ['Sin lectura']);
     expect(rows[1][10], 'Perro');

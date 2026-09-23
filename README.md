@@ -50,3 +50,16 @@ También se aceptan variantes como "Nro. Cliente", "Nombre Propietario",
 "Lectura Hace 1 Mes" o "Lectura Hace 2 Meses" (sin importar mayúsculas ni
 tildes). Si alguna fila tiene errores no se importa nada y la app muestra
 el número de cada fila con su problema.
+
+## Fotos de evidencia
+
+En la pantalla de lectura, **Tomar foto de evidencia (Opcional)** abre la
+cámara. La foto se guarda reducida (máx. 1600 px, calidad 70) en la carpeta
+`evidence_photos` de la app y queda asociada a la visita; el Excel
+exportado indica el nombre del archivo en la columna "Foto". Al cerrar el
+mes la visita se reinicia (la foto deja de estar asociada, pero el archivo
+se conserva en el teléfono).
+
+## Requisitos
+
+- Flutter 3.44 o superior (lo exige `image_picker`).

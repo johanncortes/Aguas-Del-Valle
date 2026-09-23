@@ -4,6 +4,7 @@ import '../services/meter_repository.dart';
 import '../services/excel_export_service.dart';
 import '../services/excel_import_service.dart';
 import '../services/location_service.dart';
+import '../services/photo_service.dart';
 
 /// Repository singleton provider
 final meterRepositoryProvider = Provider<MeterRepository>((ref) {
@@ -34,6 +35,11 @@ final locationServiceProvider = Provider<LocationService>((ref) {
   return const LocationService();
 });
 
+/// Camera evidence photos (overridable in tests)
+final photoServiceProvider = Provider<PhotoService>((ref) {
+  return PhotoService();
+});
+
 /// StateNotifier for managing client records
 class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
   final MeterRepository _repository;
@@ -56,12 +62,14 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
   ///
   /// Also stores where the device was (GPS audit). Without location the
   /// visit is still saved, with null coordinates: the reader's work is
-  /// never blocked by GPS. Returns the saved record.
+  /// never blocked by GPS. [photoPath] is the optional evidence photo.
+  /// Returns the saved record.
   Future<ClientMeterRecord?> saveReading(
     String clientId, {
     int? reading,
     String? nonReadingReason,
     String? observations,
+    String? photoPath,
   }) async {
     if ((reading == null) == (nonReadingReason == null)) {
       throw ArgumentError(
@@ -90,6 +98,7 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
           : trimmedObservations,
       readingLatitude: position?.latitude,
       readingLongitude: position?.longitude,
+      photoPath: photoPath,
     );
 
     await _repository.saveClient(updated);

@@ -1,44 +1,54 @@
 import 'package:flutter/material.dart';
 import 'app_fonts.dart';
 
+/// Light, high-contrast palette for outdoor use in direct sunlight.
+/// Every color used for text meets WCAG AA (≥ 4.5:1) on white and on the
+/// 20% tints used behind status badges.
 class AppTheme {
   // Brand colors — Aguas del Valle blue tones
   static const Color primaryBlue = Color(0xFF0D47A1);
-  static const Color primaryLight = Color(0xFF1976D2);
-  static const Color accentCyan = Color(0xFF00BCD4);
-  static const Color surfaceDark = Color(0xFF0A1628);
-  static const Color surfaceCard = Color(0xFF122240);
-  static const Color surfaceCardLight = Color(0xFF1A2D4F);
-  static const Color textPrimary = Color(0xFFF5F5F5);
-  static const Color textSecondary = Color(0xFFB0BEC5);
-  static const Color successGreen = Color(0xFF4CAF50);
-  static const Color warningAmber = Color(0xFFFFA726);
-  static const Color errorRed = Color(0xFFEF5350);
-  static const Color pendingRed = Color(0xFFE53935);
-  static const Color visitedGreen = Color(0xFF43A047);
-  static const Color noReadingOrange = Color(0xFFFB8C00);
+  static const Color primaryLight = Color(0xFF1557A8);
+  static const Color accentCyan = Color(0xFF006064);
 
-  static ThemeData get darkTheme {
+  // Surfaces
+  static const Color background = Color(0xFFFFFFFF);
+  static const Color surface = Color(0xFFF1F5F9);
+  static const Color surfaceVariant = Color(0xFFE2E8F0);
+
+  // Text
+  static const Color textPrimary = Color(0xFF0D1B2A);
+  static const Color textSecondary = Color(0xFF455A64);
+
+  // Status (text-safe on white; also used as pin fills)
+  static const Color successGreen = Color(0xFF1B5E20);
+  static const Color warningAmber = Color(0xFF805300);
+  static const Color errorRed = Color(0xFFB71C1C);
+  static const Color pendingRed = Color(0xFFB71C1C);
+  static const Color visitedGreen = Color(0xFF1B5E20);
+  static const Color noReadingOrange = Color(0xFFA34100);
+
+  static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: surfaceDark,
-      colorScheme: ColorScheme.dark(
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: background,
+      colorScheme: const ColorScheme.light(
         primary: primaryLight,
         secondary: accentCyan,
-        surface: surfaceCard,
+        surface: background,
         error: errorRed,
         onPrimary: Colors.white,
-        onSecondary: Colors.black,
+        onSecondary: Colors.white,
         onSurface: textPrimary,
         onError: Colors.white,
       ),
-      textTheme: ThemeData.dark().textTheme.apply(
+      textTheme: ThemeData.light().textTheme.apply(
         bodyColor: textPrimary,
         displayColor: textPrimary,
       ),
       appBarTheme: AppBarTheme(
-        backgroundColor: surfaceDark,
+        backgroundColor: background,
+        foregroundColor: textPrimary,
         elevation: 0,
         centerTitle: true,
         titleTextStyle: AppFonts.text(
@@ -49,7 +59,7 @@ class AppTheme {
         iconTheme: const IconThemeData(color: textPrimary),
       ),
       cardTheme: CardThemeData(
-        color: surfaceCard,
+        color: surface,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
@@ -79,11 +89,16 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: surfaceCardLight,
+        fillColor: surface,
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        // Visible field outline: borderless fills disappear in sunlight
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
+          borderSide: const BorderSide(color: textSecondary),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: textSecondary),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
@@ -94,11 +109,12 @@ class AppTheme {
           borderSide: const BorderSide(color: errorRed, width: 2),
         ),
         labelStyle: AppFonts.text(color: textSecondary),
-        hintStyle: AppFonts.text(color: textSecondary.withValues(alpha: 0.5)),
+        hintStyle: AppFonts.text(color: textSecondary),
       ),
       snackBarTheme: SnackBarThemeData(
-        backgroundColor: surfaceCard,
-        contentTextStyle: AppFonts.text(color: textPrimary),
+        // Dark SnackBars stand out over the light UI
+        backgroundColor: textPrimary,
+        contentTextStyle: AppFonts.text(color: Colors.white),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         behavior: SnackBarBehavior.floating,
       ),

@@ -173,4 +173,15 @@ void main() {
       expect(record('sp-001').readingLatitude, isNull);
     });
   });
+
+  group('evidence photo', () {
+    test('saves the photo path and replaces it on a later save', () async {
+      await notifier.saveReading('sp-001',
+          reading: 1300, photoPath: '/docs/evidence_photos/a.jpg');
+      expect(record('sp-001').photoPath, '/docs/evidence_photos/a.jpg');
+
+      await notifier.saveReading('sp-001', reading: 1300);
+      expect(record('sp-001').photoPath, isNull);
+    });
+  });
 }

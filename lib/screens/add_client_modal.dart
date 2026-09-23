@@ -38,7 +38,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
     return Container(
       margin: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark,
+        color: AppTheme.background,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: AppTheme.accentCyan.withValues(alpha: 0.2),
@@ -267,7 +267,7 @@ class _AddClientModalState extends ConsumerState<AddClientModal> {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppTheme.textSecondary,
                           side: const BorderSide(
-                              color: AppTheme.surfaceCardLight),
+                              color: AppTheme.surfaceVariant),
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(14),

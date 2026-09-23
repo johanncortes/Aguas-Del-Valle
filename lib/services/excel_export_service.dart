@@ -44,6 +44,9 @@ class ExcelExportService {
     // Where the reader was when saving the visit (GPS audit)
     _number('Latitud Lectura', 16, (r) => r.readingLatitude),
     _number('Longitud Lectura', 16, (r) => r.readingLongitude),
+    // Evidence photos stay on the phone (evidence_photos folder); the
+    // file name links each one to its row.
+    _text('Foto', 30, (r) => r.photoPath?.split('/').last ?? ''),
   ];
 
   static _ExportColumn _text(

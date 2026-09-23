@@ -1,8 +1,11 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/client_meter_record.dart';
 import '../providers/meter_providers.dart';
+import '../services/photo_service.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 
@@ -28,6 +31,21 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
 
   /// When set, the meter could not be read and the reading input is hidden.
   NonReadingReason? _nonReadingReason;
+
+  late final PhotoService _photoService;
+  bool _isTakingPhoto = false;
+
+  /// Evidence photo shown on screen (saved with the visit).
+  String? _photoPath;
+
+  /// Photo stored with the visit when the screen opened.
+  String? _initialPhotoPath;
+
+  /// Photos taken on this screen; the ones not saved are deleted on exit.
+  final _takenPhotos = <String>{};
+
+  /// Photo actually saved with the visit, once saving succeeds.
+  String? _savedPhotoPath;
 
   @override
   void initState() {
@@ -56,6 +74,8 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
     }
     _nonReadingReason = NonReadingReason.fromLabel(client?.nonReadingReason);
     _observationsController.text = client?.observations ?? '';
+    _photoPath = _initialPhotoPath = client?.photoPath;
+    _photoService = ref.read(photoServiceProvider);
 
     _readingController.addListener(_onReadingChanged);
   }
@@ -69,6 +89,11 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
 
   @override
   void dispose() {
+    // Photos taken here but not saved (replaced, removed, or the reader
+    // left without saving) would only waste storage.
+    for (final path in _takenPhotos) {
+      if (path != _savedPhotoPath) _photoService.deletePhoto(path);
+    }
     _readingController.removeListener(_onReadingChanged);
     _readingController.dispose();
     _readingFocusNode.dispose();
@@ -90,14 +115,14 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
     }
 
     return Scaffold(
-      backgroundColor: AppTheme.surfaceDark,
+      backgroundColor: AppTheme.background,
       appBar: AppBar(
-        backgroundColor: AppTheme.surfaceDark,
+        backgroundColor: AppTheme.background,
         leading: IconButton(
           icon: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppTheme.surfaceCard,
+              color: AppTheme.surface,
               borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(Icons.arrow_back_ios_new, size: 18),
@@ -142,6 +167,10 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
 
                 // Free-text notes
                 _buildObservationsInput(),
+                const SizedBox(height: 12),
+
+                // Optional evidence photo
+                _buildPhotoEvidence(client),
                 const SizedBox(height: 32),
 
                 // Save button
@@ -162,7 +191,7 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
         gradient: LinearGradient(
           colors: [
             AppTheme.primaryBlue.withValues(alpha: 0.4),
-            AppTheme.surfaceCard,
+            AppTheme.surface,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -222,7 +251,7 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
-              color: AppTheme.surfaceDark.withValues(alpha: 0.5),
+              color: AppTheme.background.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -258,10 +287,10 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCard,
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: AppTheme.surfaceCardLight.withValues(alpha: 0.5),
+          color: AppTheme.surfaceVariant.withValues(alpha: 0.5),
         ),
       ),
       child: Column(
@@ -298,7 +327,7 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: AppTheme.surfaceCardLight,
+                  color: AppTheme.surfaceVariant,
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -323,7 +352,7 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: AppTheme.surfaceDark.withValues(alpha: 0.5),
+              color: AppTheme.background.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -359,7 +388,7 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCardLight,
+        color: AppTheme.surfaceVariant,
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -398,12 +427,12 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCard,
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: _nonReadingReason != null
               ? AppTheme.warningAmber.withValues(alpha: 0.5)
-              : AppTheme.surfaceCardLight.withValues(alpha: 0.5),
+              : AppTheme.surfaceVariant.withValues(alpha: 0.5),
         ),
       ),
       child: Column(
@@ -429,7 +458,7 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
             key: const Key('nonReadingReasonDropdown'),
             initialValue: _nonReadingReason,
             isExpanded: true,
-            dropdownColor: AppTheme.surfaceCard,
+            dropdownColor: AppTheme.surface,
             style: AppFonts.text(fontSize: 15, color: AppTheme.textPrimary),
             items: [
               DropdownMenuItem<NonReadingReason?>(
@@ -484,11 +513,110 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
     );
   }
 
+  Widget _buildPhotoEvidence(ClientMeterRecord client) {
+    final photoPath = _photoPath;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (photoPath != null) ...[
+          Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.file(
+                  File(photoPath),
+                  key: const Key('evidencePhotoThumbnail'),
+                  width: 140,
+                  height: 140,
+                  fit: BoxFit.cover,
+                  cacheWidth: 420,
+                  errorBuilder: (_, _, _) => Container(
+                    width: 140,
+                    height: 140,
+                    color: AppTheme.surfaceVariant,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.broken_image_outlined,
+                        color: AppTheme.textSecondary, size: 36),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Material(
+                  color: AppTheme.textPrimary.withValues(alpha: 0.8),
+                  shape: const CircleBorder(),
+                  child: IconButton(
+                    tooltip: 'Eliminar foto',
+                    visualDensity: VisualDensity.compact,
+                    icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                    onPressed: () => setState(() => _photoPath = null),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+        ],
+        SizedBox(
+          width: double.infinity,
+          child: OutlinedButton.icon(
+            onPressed: _isTakingPhoto || _isSaving
+                ? null
+                : () => _takePhoto(client),
+            icon: _isTakingPhoto
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.photo_camera_outlined),
+            label: Text(
+              photoPath == null
+                  ? 'Tomar foto de evidencia (Opcional)'
+                  : 'Volver a tomar foto',
+              style: AppFonts.text(fontSize: 15, fontWeight: FontWeight.w600),
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppTheme.primaryLight,
+              side: const BorderSide(color: AppTheme.primaryLight, width: 1.5),
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _takePhoto(ClientMeterRecord client) async {
+    setState(() => _isTakingPhoto = true);
+    try {
+      final path = await _photoService.takePhoto(client.id);
+      if (path == null) return; // cancelled
+      _takenPhotos.add(path);
+      if (mounted) setState(() => _photoPath = path);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No se pudo abrir la cámara. Revise el permiso de '
+                'cámara en los ajustes del teléfono.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isTakingPhoto = false);
+    }
+  }
+
   Widget _buildCurrentReadingInput(ClientMeterRecord client) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCard,
+        color: AppTheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: AppTheme.accentCyan.withValues(alpha: 0.3),
@@ -625,17 +753,17 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
                 colors: isNegative
                     ? [
                         AppTheme.warningAmber.withValues(alpha: 0.15),
-                        AppTheme.surfaceCard,
+                        AppTheme.surface,
                       ]
                     : [
                         AppTheme.visitedGreen.withValues(alpha: 0.15),
-                        AppTheme.surfaceCard,
+                        AppTheme.surface,
                       ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               )
             : null,
-        color: consumption == null ? AppTheme.surfaceCard : null,
+        color: consumption == null ? AppTheme.surface : null,
         borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
@@ -765,7 +893,14 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
             reading: reading,
             nonReadingReason: reason?.label,
             observations: _observationsController.text,
+            photoPath: _photoPath,
           );
+      _savedPhotoPath = _photoPath;
+      // The previously saved photo was replaced or removed
+      final initial = _initialPhotoPath;
+      if (initial != null && initial != _photoPath) {
+        _photoService.deletePhoto(initial);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -846,7 +981,7 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppTheme.surfaceCard,
+        backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: [

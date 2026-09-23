@@ -56,8 +56,11 @@ void main() {
         currentReading: 145,
         isVisited: true,
         observations: 'ok',
-      ).copyWith(readingLatitude: -30.7, readingLongitude: -70.7)
-          .startNewCycle();
+      ).copyWith(
+        readingLatitude: -30.7,
+        readingLongitude: -70.7,
+        photoPath: '/docs/evidence_photos/a.jpg',
+      ).startNewCycle();
 
       expect(next.readingTwoMonthsAgo, 120);
       expect(next.readingOneMonthAgo, 145);
@@ -67,6 +70,7 @@ void main() {
       expect(next.observations, isNull);
       expect(next.readingLatitude, isNull);
       expect(next.readingLongitude, isNull);
+      expect(next.photoPath, isNull);
     });
 
     test('keeps history intact for a client that was not visited', () {
@@ -128,7 +132,11 @@ void main() {
         isVisited: true,
         nonReadingReason: NonReadingReason.houseClosed.label,
         observations: 'Volver el lunes',
-      ).copyWith(readingLatitude: -30.7296, readingLongitude: -70.7644));
+      ).copyWith(
+        readingLatitude: -30.7296,
+        readingLongitude: -70.7644,
+        photoPath: '/docs/evidence_photos/a.jpg',
+      ));
       await box.close();
 
       final reopened = await Hive.openBox<ClientMeterRecord>('records');
@@ -138,6 +146,7 @@ void main() {
       expect(record.hasNonReading, isTrue);
       expect(record.readingLatitude, -30.7296);
       expect(record.readingLongitude, -70.7644);
+      expect(record.photoPath, '/docs/evidence_photos/a.jpg');
     });
 
     test('reads records saved before the new fields existed', () async {
@@ -154,6 +163,7 @@ void main() {
       expect(record.observations, isNull);
       expect(record.readingLatitude, isNull);
       expect(record.readingLongitude, isNull);
+      expect(record.photoPath, isNull);
     });
   });
 }

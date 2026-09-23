@@ -142,8 +142,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          AppTheme.surfaceDark.withValues(alpha: 0.9),
-                          AppTheme.surfaceDark.withValues(alpha: 0.0),
+                          AppTheme.background.withValues(alpha: 0.9),
+                          AppTheme.background.withValues(alpha: 0.0),
                         ],
                       ),
                     ),
@@ -198,7 +198,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     onPressed: _toggleAddPinMode,
                     backgroundColor: _isAddPinMode
                         ? AppTheme.warningAmber
-                        : AppTheme.surfaceCard.withValues(alpha: 0.9),
+                        : AppTheme.surface.withValues(alpha: 0.9),
                     child: Icon(
                       _isAddPinMode ? Icons.close : Icons.add_location_alt,
                       size: 20,
@@ -210,16 +210,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   FloatingActionButton.small(
                     heroTag: 'locate_me',
                     onPressed: _locateMe,
-                    backgroundColor: AppTheme.surfaceCard.withValues(alpha: 0.9),
-                    child: const Icon(Icons.my_location, size: 20, color: Colors.blue),
+                    backgroundColor: AppTheme.surface.withValues(alpha: 0.9),
+                    child: const Icon(Icons.my_location,
+                        size: 20, color: AppTheme.primaryLight),
                   ),
                   const SizedBox(height: 10),
                   // Re-center on Sector Sol de las Praderas button
                   FloatingActionButton.small(
                     heroTag: 'center_map',
                     onPressed: _centerMap,
-                    backgroundColor: AppTheme.surfaceCard.withValues(alpha: 0.9),
-                    child: const Icon(Icons.explore_outlined, size: 20),
+                    backgroundColor: AppTheme.surface.withValues(alpha: 0.9),
+                    child: const Icon(Icons.explore_outlined,
+                        size: 20, color: AppTheme.textPrimary),
                   ),
                   const SizedBox(height: 10),
                   // Export button
@@ -334,7 +336,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark.withValues(alpha: 0.92),
+        color: AppTheme.background.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: AppTheme.accentCyan.withValues(alpha: 0.2),
@@ -432,7 +434,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     return PopupMenuButton<_HeaderMenuAction>(
       tooltip: 'Opciones',
       icon: const Icon(Icons.more_vert, color: AppTheme.textSecondary),
-      color: AppTheme.surfaceCard,
+      color: AppTheme.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       onSelected: (action) {
         switch (action) {
@@ -487,7 +489,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppTheme.surfaceCard,
+        backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Cerrar mes',
@@ -566,7 +568,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppTheme.surfaceCard,
+        backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Importar ruta',
@@ -660,7 +662,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     showDialog<void>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        backgroundColor: AppTheme.surfaceCard,
+        backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'No se pudo importar',
@@ -730,7 +732,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       margin: const EdgeInsets.symmetric(horizontal: 32),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark.withValues(alpha: 0.95),
+        color: AppTheme.background.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.accentCyan.withValues(alpha: 0.3)),
       ),
@@ -1084,7 +1086,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppTheme.surfaceCard,
+        backgroundColor: AppTheme.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Eliminar Cliente',
@@ -1156,7 +1158,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         margin: const EdgeInsets.all(16),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceCard,
+          color: AppTheme.surface,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: AppTheme.accentCyan.withValues(alpha: 0.2),
@@ -1280,8 +1282,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: client.isVisited
-                      ? AppTheme.surfaceCardLight
+                      ? AppTheme.surfaceVariant
                       : AppTheme.primaryLight,
+                  foregroundColor:
+                      client.isVisited ? AppTheme.textPrimary : Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
               ),
@@ -1354,7 +1358,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         decoration: BoxDecoration(
           color: highlight
               ? AppTheme.accentCyan.withValues(alpha: 0.15)
-              : AppTheme.surfaceCardLight,
+              : AppTheme.surfaceVariant,
           borderRadius: BorderRadius.circular(12),
           border: highlight
               ? Border.all(color: AppTheme.accentCyan.withValues(alpha: 0.3))
@@ -1394,7 +1398,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
       padding: EdgeInsets.fromLTRB(
           20, 20, 20, MediaQuery.of(context).padding.bottom + 16),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceDark.withValues(alpha: 0.95),
+        color: AppTheme.background.withValues(alpha: 0.95),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         border: Border(
           top: BorderSide(
@@ -1444,7 +1448,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             child: LinearProgressIndicator(
               value: progress.percent / 100,
               minHeight: 8,
-              backgroundColor: AppTheme.surfaceCardLight,
+              backgroundColor: AppTheme.surfaceVariant,
               valueColor: AlwaysStoppedAnimation<Color>(
                 progress.percent == 100
                     ? AppTheme.visitedGreen
