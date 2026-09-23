@@ -146,14 +146,49 @@ void main() {
         'Punta Blanca': 26,
       });
 
+      // No invented positions: they have no pin until fixed in the field
       for (final c in clients) {
         expect(c.isVisited, isFalse);
         expect(c.readingOneMonthAgo, 0);
-        expect(c.observations, MeterRepository.seedLocationNote);
+        expect(c.latitude, isNull);
+        expect(c.longitude, isNull);
+        expect(c.hasLocation, isFalse);
+        expect(c.observations, isNull);
       }
-      // Every pin has its own spot, so none hides another on the map
-      final spots = {for (final c in clients) (c.latitude, c.longitude)};
-      expect(spots, hasLength(185));
+    });
+
+    test('removes the placeholder grid of the previous version', () async {
+      const legacyNote =
+          'Ubicación por confirmar: use "Reubicar" en la primera visita.';
+      ClientMeterRecord legacy(String number, {bool visited = false}) =>
+          ClientMeterRecord(
+            id: 'seed-$number',
+            clientNumber: number,
+            ownerName: 'Cliente $number',
+            readingTwoMonthsAgo: 0,
+            readingOneMonthAgo: 0,
+            currentReading: visited ? 10 : null,
+            isVisited: visited,
+            latitude: -30.72,
+            longitude: -70.76,
+            sector: 'Varillar',
+            observations: legacyNote,
+          );
+      await notifier.importClients([
+        legacy('1'),
+        legacy('2', visited: true), // already visited: left alone
+        _client('imp-1', '99'), // imported with real coordinates
+      ]);
+
+      final reloaded = ClientRecordsNotifier(MeterRepository());
+      await reloaded.loadClients();
+      final byId = {for (final c in reloaded.state) c.id: c};
+
+      expect(byId['seed-1']!.hasLocation, isFalse);
+      expect(byId['seed-1']!.observations, isNull);
+      expect(byId['seed-1']!.sector, 'Varillar');
+      expect(byId['seed-2']!.latitude, -30.72);
+      expect(byId['imp-1']!.latitude, -30.728);
     });
 
     test('does not seed over existing data', () async {
@@ -222,6 +257,23 @@ void main() {
 
       await notifier.saveReading('sp-001', reading: 1300);
       expect(record('sp-001').photoPath, isNull);
+    });
+  });
+
+  group('fix location from GPS', () {
+    test('saves the device position as the official location', () async {
+      final position = await notifier.fixLocationFromGps('sp-001');
+
+      expect(position?.latitude, -30.7296);
+      expect(record('sp-001').latitude, -30.7296);
+      expect(record('sp-001').longitude, -70.7644);
+    });
+
+    test('changes nothing when no location is available', () async {
+      location.position = null;
+
+      expect(await notifier.fixLocationFromGps('sp-001'), isNull);
+      expect(record('sp-001').latitude, -30.728); // unchanged
     });
   });
 }

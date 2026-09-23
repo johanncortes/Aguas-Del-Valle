@@ -152,6 +152,18 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     state = await _repository.getAllClients();
   }
 
+  /// Sets the client's official location to where the device is now
+  /// (used for clients without a location). Returns the position saved,
+  /// or null when no location is available (permission denied, GPS off or
+  /// no fix), in which case nothing changes.
+  Future<DevicePosition?> fixLocationFromGps(String clientId) async {
+    final position = await _locationService.currentPosition();
+    if (position == null) return null;
+    await updateClientLocation(
+        clientId, position.latitude, position.longitude);
+    return position;
+  }
+
   /// Reset all readings for a new cycle
   Future<void> resetAll() async {
     await _repository.resetAllReadings();

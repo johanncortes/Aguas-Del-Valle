@@ -168,6 +168,7 @@ class _ClientListScreenState extends ConsumerState<ClientListScreen> {
             'N° ${client.clientNumber}',
             if (client.sector != null) client.sector!,
             detail,
+            if (!client.hasLocation) 'Sin ubicación',
           ].join(' • '),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
