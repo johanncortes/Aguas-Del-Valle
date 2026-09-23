@@ -12,6 +12,12 @@ class ClientMeterRecord {
   final double longitude;
   DateTime? updatedAt;
 
+  /// Why the meter could not be read this cycle (see [NonReadingReason]).
+  final String? nonReadingReason;
+
+  /// Free-text notes from the reader.
+  final String? observations;
+
   ClientMeterRecord({
     required this.id,
     required this.clientNumber,
@@ -23,6 +29,8 @@ class ClientMeterRecord {
     required this.latitude,
     required this.longitude,
     this.updatedAt,
+    this.nonReadingReason,
+    this.observations,
   });
 
   /// Calculated consumption in M3
@@ -37,6 +45,33 @@ class ClientMeterRecord {
     return currentReading! < readingOneMonthAgo;
   }
 
+  /// True when the reader visited the client but could not take a reading.
+  bool get hasNonReading => nonReadingReason != null && currentReading == null;
+
+  /// Returns this record prepared for the next billing cycle.
+  ///
+  /// With a new reading the history shifts one month back. Without one
+  /// (not visited, or visited with a non-reading reason) the history is
+  /// kept intact so no month is lost; only the cycle state is cleared.
+  ClientMeterRecord startNewCycle() {
+    final reading = currentReading;
+    return ClientMeterRecord(
+      id: id,
+      clientNumber: clientNumber,
+      ownerName: ownerName,
+      readingTwoMonthsAgo:
+          reading != null ? readingOneMonthAgo : readingTwoMonthsAgo,
+      readingOneMonthAgo: reading ?? readingOneMonthAgo,
+      currentReading: null,
+      isVisited: false,
+      latitude: latitude,
+      longitude: longitude,
+      updatedAt: null,
+      nonReadingReason: null,
+      observations: null,
+    );
+  }
+
   ClientMeterRecord copyWith({
     String? id,
     String? clientNumber,
@@ -48,6 +83,8 @@ class ClientMeterRecord {
     double? latitude,
     double? longitude,
     DateTime? updatedAt,
+    String? nonReadingReason,
+    String? observations,
   }) {
     return ClientMeterRecord(
       id: id ?? this.id,
@@ -60,8 +97,22 @@ class ClientMeterRecord {
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
       updatedAt: updatedAt ?? this.updatedAt,
+      nonReadingReason: nonReadingReason ?? this.nonReadingReason,
+      observations: observations ?? this.observations,
     );
   }
+}
+
+/// Reasons a meter could not be read. Stored as their [label] in Hive.
+enum NonReadingReason {
+  noAccess('Sin acceso'),
+  damagedMeter('Medidor dañado'),
+  dog('Perro'),
+  houseClosed('Casa cerrada'),
+  other('Otro');
+
+  const NonReadingReason(this.label);
+  final String label;
 }
 
 /// Manual Hive TypeAdapter for ClientMeterRecord (avoids code generation)
@@ -87,12 +138,16 @@ class ClientMeterRecordAdapter extends TypeAdapter<ClientMeterRecord> {
       latitude: fields[7] as double,
       longitude: fields[8] as double,
       updatedAt: fields[9] as DateTime?,
+      // Fields 10-11 were added later; records saved by older versions
+      // don't contain them and read back as null.
+      nonReadingReason: fields[10] as String?,
+      observations: fields[11] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, ClientMeterRecord obj) {
-    writer.writeByte(10); // number of fields
+    writer.writeByte(12); // number of fields
     writer.writeByte(0);
     writer.write(obj.id);
     writer.writeByte(1);
@@ -113,5 +168,9 @@ class ClientMeterRecordAdapter extends TypeAdapter<ClientMeterRecord> {
     writer.write(obj.longitude);
     writer.writeByte(9);
     writer.write(obj.updatedAt);
+    writer.writeByte(10);
+    writer.write(obj.nonReadingReason);
+    writer.writeByte(11);
+    writer.write(obj.observations);
   }
 }

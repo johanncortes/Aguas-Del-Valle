@@ -186,25 +186,13 @@ class MeterRepository {
     }
   }
 
-  /// Reset all records for a new cycle
+  /// Close the current cycle and prepare every record for the next one.
+  /// See [ClientMeterRecord.startNewCycle] for how history is handled.
   Future<void> resetAllReadings() async {
     final box = await _getBox();
-    final clients = box.values.toList();
-    for (final client in clients) {
-      final reset = ClientMeterRecord(
-        id: client.id,
-        clientNumber: client.clientNumber,
-        ownerName: client.ownerName,
-        readingTwoMonthsAgo: client.readingOneMonthAgo,
-        readingOneMonthAgo: client.currentReading ?? client.readingOneMonthAgo,
-        currentReading: null,
-        isVisited: false,
-        latitude: client.latitude,
-        longitude: client.longitude,
-        updatedAt: null,
-      );
-      await box.put(reset.id, reset);
-    }
+    await box.putAll({
+      for (final client in box.values) client.id: client.startNewCycle(),
+    });
   }
 
   /// Clear all data and reseed (for development / location change)
