@@ -3,6 +3,11 @@ import '../models/client_meter_record.dart';
 import '../utils/text_normalize.dart';
 import 'meter_providers.dart';
 
+/// Id of the client whose location is being picked on the map, or null.
+/// While set, the home screen is in "location picker" mode: a fixed
+/// crosshair over the map and a Cancelar / Confirmar Ubicación panel.
+final locationPickerClientProvider = StateProvider<String?>((ref) => null);
+
 /// Text typed in the client list search bar.
 final clientSearchQueryProvider = StateProvider.autoDispose<String>((ref) => '');
 

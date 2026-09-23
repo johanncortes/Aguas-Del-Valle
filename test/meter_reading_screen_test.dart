@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:aguas_monte_patria/models/client_meter_record.dart';
+import 'package:aguas_monte_patria/providers/client_list_providers.dart';
 import 'package:aguas_monte_patria/providers/meter_providers.dart';
 import 'package:aguas_monte_patria/screens/meter_reading_screen.dart';
-import 'package:aguas_monte_patria/services/location_service.dart';
 import 'package:aguas_monte_patria/services/meter_repository.dart';
 import 'package:aguas_monte_patria/services/photo_service.dart';
 
@@ -25,25 +25,6 @@ class _FakeClientRecordsNotifier extends ClientRecordsNotifier {
 
   /// What saveReading returns (the saved record in the real notifier).
   ClientMeterRecord? savedRecord;
-
-  /// Position the GPS "returns" in fixLocationFromGps; null = unavailable.
-  DevicePosition? gpsPosition;
-
-  @override
-  Future<DevicePosition?> fixLocationFromGps(String clientId) async {
-    final position = gpsPosition;
-    if (position != null) {
-      state = [
-        for (final c in state)
-          c.id == clientId
-              ? c.copyWith(
-                  latitude: position.latitude,
-                  longitude: position.longitude)
-              : c,
-      ];
-    }
-    return position;
-  }
 
   @override
   Future<ClientMeterRecord?> saveReading(
@@ -366,7 +347,7 @@ void main() {
     });
   });
 
-  group('fix location', () {
+  group('manual location', () {
     final card = find.byKey(const Key('fixLocationCard'));
 
     testWidgets('not shown for a client that has a location',
@@ -375,33 +356,22 @@ void main() {
       expect(card, findsNothing);
     });
 
-    testWidgets('fixes the location with GPS and hides the button',
-        (tester) async {
-      final notifier = await _openScreen(tester, client(located: false));
-      notifier.gpsPosition = (latitude: -30.72961, longitude: -70.76439);
-      expect(card, findsOneWidget);
-
-      await tester.tap(find.text('Fijar Ubicación en el Mapa (GPS)'));
-      await tester.pump();
-      await tester.pump();
-
-      expect(find.text('Ubicación fijada: -30.72961, -70.76439'),
-          findsOneWidget);
-      expect(card, findsNothing);
-      expect(notifier.state.single.hasLocation, isTrue);
-    });
-
-    testWidgets('reports when GPS is unavailable and keeps the button',
+    testWidgets('sends the reader to the map in picker mode',
         (tester) async {
       await _openScreen(tester, client(located: false));
-
-      await tester.tap(find.text('Fijar Ubicación en el Mapa (GPS)'));
-      await tester.pump();
-      await tester.pump();
-
-      expect(find.textContaining('No se pudo obtener la ubicación'),
-          findsOneWidget);
       expect(card, findsOneWidget);
+
+      final button = find.text('Ubicar manualmente en el mapa');
+      await tester.ensureVisible(button);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+
+      // Back on the first (home) route, with the picker armed for the client
+      expect(find.byType(MeterReadingScreen), findsNothing);
+      expect(find.text('open'), findsOneWidget);
+      final container =
+          ProviderScope.containerOf(tester.element(find.text('open')));
+      expect(container.read(locationPickerClientProvider), 'test-001');
     });
   });
 }

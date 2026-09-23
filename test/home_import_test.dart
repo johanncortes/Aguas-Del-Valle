@@ -1,10 +1,12 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
 import 'package:aguas_monte_patria/models/client_meter_record.dart';
+import 'package:aguas_monte_patria/providers/client_list_providers.dart';
 import 'package:aguas_monte_patria/providers/meter_providers.dart';
 import 'package:aguas_monte_patria/screens/home_screen.dart';
 import 'package:aguas_monte_patria/services/cached_tile_provider.dart';
@@ -30,6 +32,15 @@ class _FakeClientRecordsNotifier extends ClientRecordsNotifier {
   Future<int> importClients(List<ClientMeterRecord> records) async {
     state = records;
     return records.length;
+  }
+
+  @override
+  Future<void> updateClientLocation(
+      String clientId, double newLat, double newLng) async {
+    state = [
+      for (final c in state)
+        c.id == clientId ? c.copyWith(latitude: newLat, longitude: newLng) : c,
+    ];
   }
 }
 
@@ -66,6 +77,7 @@ Future<_FakeImportService> _pumpHome(
   List<ClientMeterRecord> clients = const [],
   Object? importResult,
   Size? screen,
+  String? pickingClientId,
 }) async {
   if (screen != null) {
     tester.view.physicalSize = screen * 3;
@@ -80,6 +92,8 @@ Future<_FakeImportService> _pumpHome(
       clientRecordsProvider
           .overrideWith((ref) => _FakeClientRecordsNotifier(clients)),
       excelImportServiceProvider.overrideWithValue(service),
+      if (pickingClientId != null)
+        locationPickerClientProvider.overrideWith((ref) => pickingClientId),
     ],
     child: const MaterialApp(home: HomeScreen()),
   ));
@@ -222,5 +236,100 @@ void main() {
     expect(find.byIcon(Icons.water_drop), findsNWidgets(2)); // logo + pin
     expect(find.byKey(const Key('unlocatedBanner')), findsNothing);
     await _unmount(tester);
+  });
+
+  group('location picker mode', () {
+    final clients = [
+      _client('a', located: false),
+      _client('b'),
+    ];
+
+    ProviderContainer container(WidgetTester tester) =>
+        ProviderScope.containerOf(tester.element(find.byType(HomeScreen)));
+
+    testWidgets('shows the crosshair and panel and hides the normal UI',
+        (tester) async {
+      await _pumpHome(tester, clients: clients, pickingClientId: 'a');
+
+      expect(find.byKey(const Key('locationPickerCrosshair')), findsOneWidget);
+      expect(find.text('Mueve el mapa para ubicar a Cliente a'),
+          findsOneWidget);
+      expect(find.text('Cancelar'), findsOneWidget);
+      expect(find.text('Confirmar Ubicación'), findsOneWidget);
+
+      expect(find.byTooltip('Agregar cliente'), findsNothing);
+      expect(find.byTooltip('Centrar mapa'), findsNothing);
+      expect(find.text('Exportar Excel'), findsNothing);
+      // Kept: helps when the reader is near the house
+      expect(find.byTooltip('Mi ubicación'), findsOneWidget);
+      expect(find.text('Progreso de Ruta'), findsNothing);
+      expect(find.byKey(const Key('unlocatedBanner')), findsNothing);
+      await _unmount(tester);
+    });
+
+    testWidgets('the crosshair ignores touches', (tester) async {
+      await _pumpHome(tester, clients: clients, pickingClientId: 'a');
+
+      final ignorePointer = tester.widget<IgnorePointer>(find.ancestor(
+        of: find.byKey(const Key('locationPickerCrosshair')),
+        matching: find.byType(IgnorePointer),
+      ).first);
+      expect(ignorePointer.ignoring, isTrue);
+      await _unmount(tester);
+    });
+
+    testWidgets('Cancelar leaves picker mode without saving', (tester) async {
+      await _pumpHome(tester, clients: clients, pickingClientId: 'a');
+
+      await tester.tap(find.text('Cancelar'));
+      await tester.pump();
+
+      expect(container(tester).read(locationPickerClientProvider), isNull);
+      expect(find.byKey(const Key('locationPickerCrosshair')), findsNothing);
+      expect(find.text('Progreso de Ruta'), findsOneWidget);
+      final a = container(tester)
+          .read(clientRecordsProvider)
+          .firstWhere((c) => c.id == 'a');
+      expect(a.hasLocation, isFalse);
+      await _unmount(tester);
+    });
+
+    testWidgets('Confirmar saves the map center as the client location',
+        (tester) async {
+      await _pumpHome(tester, clients: clients, pickingClientId: 'a');
+
+      await tester.tap(find.text('Confirmar Ubicación'));
+      await tester.pump();
+      await tester.pump();
+
+      final a = container(tester)
+          .read(clientRecordsProvider)
+          .firstWhere((c) => c.id == 'a');
+      // Nothing moved the map: the center is the default one
+      expect(a.latitude, closeTo(-30.729639, 1e-6));
+      expect(a.longitude, closeTo(-70.764389, 1e-6));
+      expect(container(tester).read(locationPickerClientProvider), isNull);
+      expect(find.text('Ubicación de Cliente a guardada.'), findsOneWidget);
+      await _unmount(tester);
+    });
+
+    testWidgets('dragging the map changes the confirmed position',
+        (tester) async {
+      await _pumpHome(tester, clients: clients, pickingClientId: 'a');
+
+      await tester.drag(find.byType(FlutterMap), const Offset(-120, 80));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar Ubicación'));
+      await tester.pump();
+      await tester.pump();
+
+      final a = container(tester)
+          .read(clientRecordsProvider)
+          .firstWhere((c) => c.id == 'a');
+      // Dragging left moves the center east; dragging down moves it north
+      expect(a.longitude!, greaterThan(-70.764389));
+      expect(a.latitude!, greaterThan(-30.729639));
+      await _unmount(tester);
+    });
   });
 }

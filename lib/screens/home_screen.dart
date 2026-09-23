@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import '../models/client_meter_record.dart';
+import '../providers/client_list_providers.dart';
 import '../providers/meter_providers.dart';
 import '../services/cached_tile_provider.dart';
 import '../services/excel_import_service.dart';
@@ -116,6 +118,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     final clients = ref.watch(clientRecordsProvider);
     final progress = ref.watch(routeProgressProvider);
 
+    // Location picker mode: the reader places a client's pin by moving the
+    // map under a fixed crosshair (started from the client's screen).
+    ref.listen<String?>(locationPickerClientProvider, (_, next) {
+      if (next != null) _enterLocationPicker();
+    });
+    final pickingId = ref.watch(locationPickerClientProvider);
+    final pickingClient = pickingId == null
+        ? null
+        : clients.where((c) => c.id == pickingId).firstOrNull;
+    if (pickingId != null && pickingClient == null && !_isLoading) {
+      // The client no longer exists (e.g. a new route was imported)
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _exitLocationPicker();
+      });
+    }
+    final isPicking = pickingClient != null;
+
     return Scaffold(
       body: _isLoading
           ? const Center(
@@ -124,12 +143,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           : Stack(
               children: [
                 // Map layer
-                _buildMap(clients),
+                _buildMap(clients, isPicking: isPicking),
 
                 // First run / empty route hint
                 // Above center, so it never meets the map controls that
                 // sit on top of the bottom panel.
-                if (clients.isEmpty)
+                if (clients.isEmpty && !isPicking)
                   Align(
                     alignment: const Alignment(0, -0.3),
                     child: _buildEmptyRouteCard(progress),
@@ -166,6 +185,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                 // Clients waiting for their location to be fixed
                 if (!_isAddPinMode &&
                     !_isRelocatingMode &&
+                    !isPicking &&
                     clients.any((c) => !c.hasLocation))
                   Positioned(
                     top: MediaQuery.of(context).padding.top + 78,
@@ -193,26 +213,183 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                     child: _buildRelocatingBanner(_relocatingClient!),
                   ),
 
+                // Location picker: fixed crosshair at the exact map center.
+                // It ignores touches so the map can be dragged under it.
+                if (isPicking) const IgnorePointer(child: _PickerCrosshair()),
+
                 // Map controls (bottom right, right above the panel) and
-                // the bottom progress panel
+                // the bottom progress panel; in picker mode, the picker
+                // panel instead.
                 Positioned(
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.only(right: 16, bottom: 12),
-                        child: _buildMapControls(clients),
-                      ),
-                      _buildBottomPanel(progress, clients),
-                    ],
-                  ),
+                  child: isPicking
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            // Kept in picker mode: centers the map on the
+                            // reader when they are near the house.
+                            Padding(
+                              padding:
+                                  const EdgeInsets.only(right: 16, bottom: 12),
+                              child: _buildLocateMeButton(),
+                            ),
+                            _buildLocationPickerPanel(pickingClient),
+                          ],
+                        )
+                      : Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Padding(
+                              padding:
+                                  const EdgeInsets.only(right: 16, bottom: 12),
+                              child: _buildMapControls(clients),
+                            ),
+                            _buildBottomPanel(progress, clients),
+                          ],
+                        ),
                 ),
               ],
             ),
+    );
+  }
+
+  void _enterLocationPicker() {
+    setState(() {
+      _isAddPinMode = false;
+      _isRelocatingMode = false;
+      _relocatingClient = null;
+      _pendingPinLocation = null;
+    });
+    // Street-level zoom so the pin can be placed on the right house
+    try {
+      final camera = _mapController.camera;
+      if (camera.zoom < 17) {
+        _mapController.move(camera.center, math.max(camera.zoom, 17));
+      }
+    } catch (_) {
+      // Map not laid out yet: keep the current view
+    }
+  }
+
+  void _exitLocationPicker() {
+    ref.read(locationPickerClientProvider.notifier).state = null;
+  }
+
+  Future<void> _confirmPickedLocation(ClientMeterRecord client) async {
+    final center = _mapController.camera.center;
+    try {
+      await ref
+          .read(clientRecordsProvider.notifier)
+          .updateClientLocation(client.id, center.latitude, center.longitude);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al guardar la ubicación: $e')),
+      );
+      return;
+    }
+    if (!mounted) return;
+    _exitLocationPicker();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Ubicación de ${client.ownerName} guardada.')),
+    );
+  }
+
+  Widget _buildLocationPickerPanel(ClientMeterRecord client) {
+    return Container(
+      key: const Key('locationPickerPanel'),
+      padding: EdgeInsets.fromLTRB(
+          16, 16, 16, MediaQuery.of(context).padding.bottom + 12),
+      decoration: BoxDecoration(
+        color: AppTheme.background,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.open_with, color: AppTheme.warningAmber),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Mueve el mapa para ubicar a ${client.ownerName}',
+                  style: AppFonts.text(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 34),
+            child: Text(
+              [
+                'N° ${client.clientNumber}',
+                if (client.sector != null) client.sector!,
+              ].join(' • '),
+              style: AppFonts.text(fontSize: 13, color: AppTheme.textSecondary),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _exitLocationPicker,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.textPrimary,
+                    side: const BorderSide(color: AppTheme.textSecondary),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('Cancelar'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                flex: 2,
+                child: ElevatedButton.icon(
+                  onPressed: () => _confirmPickedLocation(client),
+                  icon: const Icon(Icons.check),
+                  label: const Text('Confirmar Ubicación'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.visitedGreen,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Centers the map on the reader's GPS position.
+  Widget _buildLocateMeButton() {
+    return FloatingActionButton.small(
+      heroTag: 'locate_me',
+      tooltip: 'Mi ubicación',
+      onPressed: _locateMe,
+      backgroundColor: AppTheme.surface.withValues(alpha: 0.95),
+      child: const Icon(Icons.my_location,
+          size: 20, color: AppTheme.primaryLight),
     );
   }
 
@@ -236,15 +413,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           ),
         ),
         const SizedBox(height: 8),
-        // Locate me (user GPS) button
-        FloatingActionButton.small(
-          heroTag: 'locate_me',
-          tooltip: 'Mi ubicación',
-          onPressed: _locateMe,
-          backgroundColor: AppTheme.surface.withValues(alpha: 0.95),
-          child: const Icon(Icons.my_location,
-              size: 20, color: AppTheme.primaryLight),
-        ),
+        _buildLocateMeButton(),
         const SizedBox(height: 8),
         // Re-center on Sector Sol de las Praderas button
         FloatingActionButton.small(
@@ -888,7 +1057,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     );
   }
 
-  Widget _buildMap(List<ClientMeterRecord> clients) {
+  Widget _buildMap(List<ClientMeterRecord> clients, {bool isPicking = false}) {
     return FlutterMap(
       mapController: _mapController,
       options: MapOptions(
@@ -896,8 +1065,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
         initialZoom: 15.5,
         maxZoom: 19.0,
         minZoom: 12.0,
-        onTap: (_isAddPinMode || _isRelocatingMode) ? _onMapTappedForPin : null,
-        onLongPress: _onMapLongPress,
+        onTap: !isPicking && (_isAddPinMode || _isRelocatingMode)
+            ? _onMapTappedForPin
+            : null,
+        onLongPress: isPicking ? null : _onMapLongPress,
       ),
       children: [
         TileLayer(
@@ -1104,8 +1275,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   void _onMarkerTapped(ClientMeterRecord client) {
-    // If in add-pin mode or relocation mode, ignore marker taps
-    if (_isAddPinMode || _isRelocatingMode) return;
+    // Ignore marker taps while placing a pin (add, relocate or picker)
+    if (_isAddPinMode ||
+        _isRelocatingMode ||
+        ref.read(locationPickerClientProvider) != null) {
+      return;
+    }
     _showClientPreview(client);
   }
 
@@ -1716,6 +1891,49 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 }
 
 enum _HeaderMenuAction { closeCycle, importRoute }
+
+/// Pin drawn at the exact center of the map in location picker mode: its
+/// tip and the dot below it mark the point that will be saved.
+class _PickerCrosshair extends StatelessWidget {
+  const _PickerCrosshair();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: SizedBox(
+        key: const Key('locationPickerCrosshair'),
+        width: 56,
+        height: 56,
+        child: Stack(
+          clipBehavior: Clip.none,
+          alignment: Alignment.center,
+          children: [
+            // Exact center
+            Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: AppTheme.warningAmber,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+            ),
+            // Pin whose tip sits on the center
+            const Positioned(
+              bottom: 28,
+              child: Icon(
+                Icons.location_on,
+                size: 52,
+                color: AppTheme.warningAmber,
+                shadows: [Shadow(color: Colors.black38, blurRadius: 6)],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
 
 /// Custom painter for the triangular pin tail
 class _PinTailPainter extends CustomPainter {
