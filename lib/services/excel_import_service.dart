@@ -45,6 +45,15 @@ const _currentReadingAliases = ['lectura actual'];
 /// Optional "Sector" column (locality), kept as master data.
 const _sectorAliases = ['sector', 'localidad'];
 
+/// A parsed route file.
+///
+/// [isFullExport] is true when the file has a "Lectura Actual" column (a
+/// full export from the app): importing it replaces the route and rolls
+/// the month over. Otherwise it is a base template (master data and
+/// locations only), merged into the current route without touching the
+/// cycle in progress.
+typedef ImportedRoute = ({List<ClientMeterRecord> clients, bool isFullExport});
+
 /// Reads the monthly route (list of clients) from an .xlsx file.
 class ExcelImportService {
   static const _uuid = Uuid();
@@ -58,7 +67,7 @@ class ExcelImportService {
 
   /// Opens the system file picker and parses the chosen file.
   /// Returns null if the user cancels.
-  Future<List<ClientMeterRecord>?> pickAndParse() async {
+  Future<ImportedRoute?> pickAndParse() async {
     final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['xlsx'],
@@ -69,13 +78,16 @@ class ExcelImportService {
     if (bytes == null) {
       throw ExcelImportException('No se pudo leer el archivo seleccionado.');
     }
-    return parse(bytes);
+    return parseRoute(bytes);
   }
+
+  /// Parses an .xlsx file and returns only its clients (see [parseRoute]).
+  List<ClientMeterRecord> parse(List<int> bytes) => parseRoute(bytes).clients;
 
   /// Parses an .xlsx file. Either every row is valid and all clients are
   /// returned, or an [ExcelImportException] is thrown and nothing is
   /// imported.
-  List<ClientMeterRecord> parse(List<int> bytes) {
+  ImportedRoute parseRoute(List<int> bytes) {
     final Excel excel;
     try {
       excel = Excel.decodeBytes(bytes);
@@ -89,12 +101,17 @@ class ExcelImportService {
       final rows = sheet.rows;
       final header = _findHeader(rows);
       if (header != null) {
-        return _parseRows(
-          rows,
-          header.rowIndex,
-          header.columns,
-          _findColumn(rows[header.rowIndex], _currentReadingAliases),
-          _findColumn(rows[header.rowIndex], _sectorAliases),
+        final currentReadingColumn =
+            _findColumn(rows[header.rowIndex], _currentReadingAliases);
+        return (
+          clients: _parseRows(
+            rows,
+            header.rowIndex,
+            header.columns,
+            currentReadingColumn,
+            _findColumn(rows[header.rowIndex], _sectorAliases),
+          ),
+          isFullExport: currentReadingColumn != null,
         );
       }
     }

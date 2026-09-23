@@ -7,6 +7,7 @@ import '../models/client_meter_record.dart';
 import '../providers/client_list_providers.dart';
 import '../providers/meter_providers.dart';
 import '../services/photo_service.dart';
+import 'edit_client_modal.dart';
 import '../theme/app_fonts.dart';
 import '../theme/app_theme.dart';
 
@@ -134,6 +135,18 @@ class _MeterReadingScreenState extends ConsumerState<MeterReadingScreen>
           'Lectura de Medidor',
           style: AppFonts.text(fontWeight: FontWeight.w700),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Editar cliente',
+            icon: const Icon(Icons.edit),
+            onPressed: () => showModalBottomSheet<void>(
+              context: context,
+              backgroundColor: Colors.transparent,
+              isScrollControlled: true,
+              builder: (_) => EditClientModal(client: client),
+            ),
+          ),
+        ],
       ),
       body: FadeTransition(
         opacity: _fadeAnimation,

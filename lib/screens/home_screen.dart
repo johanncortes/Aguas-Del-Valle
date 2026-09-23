@@ -681,6 +681,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             _confirmCloseCycle(progress);
           case _HeaderMenuAction.importRoute:
             _importRoute(progress);
+          case _HeaderMenuAction.exportBaseTemplate:
+            _exportToExcel(ref.read(clientRecordsProvider),
+                isBaseTemplate: true);
         }
       },
       itemBuilder: (context) => [
@@ -711,6 +714,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               Flexible(
                 child: Text(
                   'Importar Ruta (Excel)',
+                  style: AppFonts.text(color: AppTheme.textPrimary),
+                ),
+              ),
+            ],
+          ),
+        ),
+        PopupMenuItem(
+          value: _HeaderMenuAction.exportBaseTemplate,
+          enabled: !_isExporting,
+          child: Row(
+            children: [
+              const Icon(Icons.map_outlined,
+                  size: 20, color: AppTheme.accentCyan),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  'Exportar Plantilla Base (Solo ubicaciones)',
                   style: AppFonts.text(color: AppTheme.textPrimary),
                 ),
               ),
@@ -802,7 +822,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     }
   }
 
-  /// Replaces the whole route with the clients from an Excel file.
+  /// Loads clients from an Excel file: a full export (with "Lectura
+  /// Actual") replaces the route and rolls the month over; a base template
+  /// updates master data and locations, keeping the cycle in progress.
   Future<void> _importRoute(RouteProgress progress) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -822,8 +844,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Esto borrará los datos actuales y cargará una nueva ruta. '
-              '¿Continuar?',
+              'Plantilla base (sin "Lectura Actual"): actualiza nombres, '
+              'sectores, ubicaciones e historial; las lecturas de este ciclo '
+              'se conservan.',
+              style: AppFonts.text(
+                fontSize: 14,
+                color: AppTheme.textSecondary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Excel exportado completo (con "Lectura Actual"): borrará los '
+              'datos actuales y cargará una nueva ruta. ¿Continuar?',
               style: AppFonts.text(
                 fontSize: 14,
                 color: AppTheme.textSecondary,
@@ -833,7 +865,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               const SizedBox(height: 12),
               _buildDialogWarning(
                 'Hay ${progress.visited} visita(s) registradas en este '
-                'ciclo. Exporta el Excel antes de importar o se perderán.',
+                'ciclo. Si importa un Excel completo, exporte antes o se '
+                'perderán.',
               ),
             ],
           ],
@@ -864,17 +897,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     setState(() => _isImporting = true);
 
     try {
-      final records = await ref.read(excelImportServiceProvider).pickAndParse();
-      if (records == null || !mounted) return; // picker cancelled
+      final route = await ref.read(excelImportServiceProvider).pickAndParse();
+      if (route == null || !mounted) return; // picker cancelled
 
-      final count = await ref
-          .read(clientRecordsProvider.notifier)
-          .importClients(records);
+      final notifier = ref.read(clientRecordsProvider.notifier);
+      final String message;
+      if (route.isFullExport) {
+        final count = await notifier.importClients(route.clients);
+        message = 'Se importaron $count clientes.';
+      } else {
+        final result = await notifier.mergeClients(route.clients);
+        message = 'Plantilla aplicada: ${result.updated} actualizados, '
+            '${result.added} nuevos. Las lecturas del ciclo se conservan.';
+      }
       if (!mounted) return;
 
-      _fitMapToClients(records);
+      _fitMapToClients(ref.read(clientRecordsProvider));
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Se importaron $count clientes.')),
+        SnackBar(content: Text(message)),
       );
     } on ExcelImportException catch (e) {
       if (!mounted) return;
@@ -1814,7 +1854,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
     _mapController.move(_mapCenter, 15.5);
   }
 
-  Future<void> _exportToExcel(List<ClientMeterRecord> clients) async {
+  /// Exports the route. [isBaseTemplate] writes only master data and
+  /// locations, for the office to place pins and send back.
+  Future<void> _exportToExcel(
+    List<ClientMeterRecord> clients, {
+    bool isBaseTemplate = false,
+  }) async {
     if (clients.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1839,7 +1884,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 
     try {
       final exportService = ref.read(excelExportServiceProvider);
-      final file = await exportService.generateExcel(clients);
+      final file = await exportService.generateExcel(clients,
+          isBaseTemplate: isBaseTemplate);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1890,7 +1936,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 }
 
-enum _HeaderMenuAction { closeCycle, importRoute }
+enum _HeaderMenuAction { closeCycle, importRoute, exportBaseTemplate }
 
 /// Pin drawn at the exact center of the map in location picker mode: its
 /// tip and the dot below it mark the point that will be saved.

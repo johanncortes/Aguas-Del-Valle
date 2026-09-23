@@ -126,4 +126,28 @@ void main() {
     expect(imported.hasLocation, isFalse);
     expect(imported.sector, 'Sol de las Praderas');
   });
+
+  test('the base template only has master data and locations', () {
+    final bytes =
+        ExcelExportService().buildExcelBytes(route, isBaseTemplate: true);
+    final rows = _rows(bytes);
+
+    expect(rows.first, [
+      'N° Cliente', 'Nombre Propietario', 'Sector', 'Latitud', 'Longitud',
+      'Lectura Hace 2 Meses', 'Lectura Hace 1 Mes',
+    ]);
+    expect(rows.last, [
+      '100', 'Cliente 100', 'Angostura', '-30.728', '-70.766', '100', '120',
+    ]);
+
+    // Imported back, it is a template: no month roll-over
+    final route2 = ExcelImportService().parseRoute(bytes);
+    expect(route2.isFullExport, isFalse);
+    expect(route2.clients.first.readingOneMonthAgo, 120);
+  });
+
+  test('a full export is detected as such on import', () {
+    final bytes = ExcelExportService().buildExcelBytes(route);
+    expect(ExcelImportService().parseRoute(bytes).isFullExport, isTrue);
+  });
 }

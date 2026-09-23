@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:aguas_monte_patria/models/client_meter_record.dart';
 import 'package:aguas_monte_patria/providers/client_list_providers.dart';
 import 'package:aguas_monte_patria/providers/meter_providers.dart';
+import 'package:aguas_monte_patria/screens/edit_client_modal.dart';
 import 'package:aguas_monte_patria/screens/meter_reading_screen.dart';
 import 'package:aguas_monte_patria/services/meter_repository.dart';
 import 'package:aguas_monte_patria/services/photo_service.dart';
@@ -25,6 +26,46 @@ class _FakeClientRecordsNotifier extends ClientRecordsNotifier {
 
   /// What saveReading returns (the saved record in the real notifier).
   ClientMeterRecord? savedRecord;
+
+  ClientMeterRecord _update(String id,
+          ClientMeterRecord Function(ClientMeterRecord) change) =>
+      change(state.firstWhere((c) => c.id == id));
+
+  @override
+  Future<void> updateClientData(
+    String clientId, {
+    required String ownerName,
+    required String? sector,
+    required int readingOneMonthAgo,
+    required int readingTwoMonthsAgo,
+  }) async {
+    final updated = _update(
+        clientId,
+        (c) => c.withMasterData(
+              ownerName: ownerName.trim(),
+              sector: sector,
+              readingOneMonthAgo: readingOneMonthAgo,
+              readingTwoMonthsAgo: readingTwoMonthsAgo,
+              latitude: c.latitude,
+              longitude: c.longitude,
+            ));
+    state = [for (final c in state) c.id == clientId ? updated : c];
+  }
+
+  @override
+  Future<void> clearClientLocation(String clientId) async {
+    final updated = _update(
+        clientId,
+        (c) => c.withMasterData(
+              ownerName: c.ownerName,
+              sector: c.sector,
+              readingOneMonthAgo: c.readingOneMonthAgo,
+              readingTwoMonthsAgo: c.readingTwoMonthsAgo,
+              latitude: null,
+              longitude: null,
+            ));
+    state = [for (final c in state) c.id == clientId ? updated : c];
+  }
 
   @override
   Future<ClientMeterRecord?> saveReading(
@@ -372,6 +413,88 @@ void main() {
       final container =
           ProviderScope.containerOf(tester.element(find.text('open')));
       expect(container.read(locationPickerClientProvider), 'test-001');
+    });
+  });
+
+  group('edit client', () {
+    Future<void> openEditor(WidgetTester tester) async {
+      await tester.tap(find.byTooltip('Editar cliente'));
+      await tester.pumpAndSettle();
+    }
+
+    Finder field(String label) => find.widgetWithText(TextFormField, label);
+
+    testWidgets('pencil opens the editor with the client number read-only',
+        (tester) async {
+      await _openScreen(tester, client());
+      await openEditor(tester);
+
+      expect(find.byType(EditClientModal), findsOneWidget);
+      expect(find.byKey(const Key('editClientNumber')), findsOneWidget);
+      expect(find.text('N° 12345'), findsOneWidget);
+      // Only name, sector and the two history readings are editable
+      expect(
+          find.descendant(
+              of: find.byType(EditClientModal),
+              matching: find.byType(TextFormField)),
+          findsNWidgets(4));
+    });
+
+    testWidgets('saves name, sector and history', (tester) async {
+      final notifier = await _openScreen(tester, client(currentReading: 145));
+      await openEditor(tester);
+
+      await tester.enterText(field('Nombre Propietario'), 'Nombre Nuevo');
+      await tester.enterText(field('Sector'), 'Varillar');
+      await tester.enterText(field('Hace 2 meses'), '105');
+      await tester.enterText(field('Hace 1 mes'), '125');
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EditClientModal), findsNothing);
+      final c = notifier.state.single;
+      expect(c.ownerName, 'Nombre Nuevo');
+      expect(c.sector, 'Varillar');
+      expect(c.readingTwoMonthsAgo, 105);
+      expect(c.readingOneMonthAgo, 125);
+      expect(c.currentReading, 145); // cycle untouched
+      expect(find.text('Datos del cliente actualizados.'), findsOneWidget);
+    });
+
+    testWidgets('rejects a 1-month reading lower than the 2-month one',
+        (tester) async {
+      final notifier = await _openScreen(tester, client());
+      await openEditor(tester);
+
+      await tester.enterText(field('Hace 2 meses'), '150');
+      await tester.enterText(field('Hace 1 mes'), '140');
+      await tester.tap(find.text('Guardar'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('No puede ser menor que la de hace 2 meses'),
+          findsOneWidget);
+      expect(notifier.state.single.readingOneMonthAgo, 120);
+    });
+
+    testWidgets('clear location is offered only when there is one',
+        (tester) async {
+      await _openScreen(tester, client(located: false));
+      await openEditor(tester);
+      expect(find.text('Borrar ubicación del mapa'), findsNothing);
+    });
+
+    testWidgets('clears the location after confirming', (tester) async {
+      final notifier = await _openScreen(tester, client());
+      await openEditor(tester);
+
+      await tester.tap(find.text('Borrar ubicación del mapa'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Borrar ubicación'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(EditClientModal), findsNothing);
+      expect(notifier.state.single.hasLocation, isFalse);
+      expect(find.text('Ubicación borrada del mapa.'), findsOneWidget);
     });
   });
 }

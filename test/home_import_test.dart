@@ -35,6 +35,32 @@ class _FakeClientRecordsNotifier extends ClientRecordsNotifier {
   }
 
   @override
+  Future<({int updated, int added})> mergeClients(
+      List<ClientMeterRecord> records) async {
+    final byNumber = {for (final c in state) c.clientNumber: c};
+    var updated = 0, added = 0;
+    for (final r in records) {
+      final existing = byNumber[r.clientNumber];
+      if (existing == null) {
+        added++;
+        byNumber[r.clientNumber] = r;
+      } else {
+        updated++;
+        byNumber[r.clientNumber] = existing.withMasterData(
+          ownerName: r.ownerName,
+          sector: r.sector ?? existing.sector,
+          readingOneMonthAgo: r.readingOneMonthAgo,
+          readingTwoMonthsAgo: r.readingTwoMonthsAgo,
+          latitude: r.latitude ?? existing.latitude,
+          longitude: r.longitude ?? existing.longitude,
+        );
+      }
+    }
+    state = byNumber.values.toList();
+    return (updated: updated, added: added);
+  }
+
+  @override
   Future<void> updateClientLocation(
       String clientId, double newLat, double newLng) async {
     state = [
@@ -47,15 +73,20 @@ class _FakeClientRecordsNotifier extends ClientRecordsNotifier {
 class _FakeImportService extends ExcelImportService {
   _FakeImportService(this.result);
 
-  /// Records to return, or an exception to throw.
+  /// An [ImportedRoute], a plain list of records (read as a full export),
+  /// or an exception to throw.
   final Object? result;
   int calls = 0;
 
   @override
-  Future<List<ClientMeterRecord>?> pickAndParse() async {
+  Future<ImportedRoute?> pickAndParse() async {
     calls++;
-    if (result is Exception) throw result!;
-    return result as List<ClientMeterRecord>?;
+    final result = this.result;
+    if (result is Exception) throw result;
+    if (result is List<ClientMeterRecord>) {
+      return (clients: result, isFullExport: true);
+    }
+    return result as ImportedRoute?;
   }
 }
 
@@ -130,10 +161,12 @@ void main() {
 
     await _openImportFromMenu(tester);
     expect(
-      find.text('Esto borrará los datos actuales y cargará una nueva ruta. '
-          '¿Continuar?'),
+      find.text('Excel exportado completo (con "Lectura Actual"): borrará los '
+          'datos actuales y cargará una nueva ruta. ¿Continuar?'),
       findsOneWidget,
     );
+    expect(find.textContaining('Plantilla base (sin "Lectura Actual")'),
+        findsOneWidget);
     await tester.tap(find.text('Elegir archivo'));
     await tester.pumpAndSettle();
 
@@ -331,5 +364,61 @@ void main() {
       expect(a.latitude!, greaterThan(-30.729639));
       await _unmount(tester);
     });
+  });
+
+  testWidgets('a base template updates clients and keeps the cycle',
+      (tester) async {
+    await _pumpHome(
+      tester,
+      clients: [_client('a', reading: 5, located: false)],
+      importResult: (
+        clients: [
+          ClientMeterRecord(
+            id: 'imp-a',
+            clientNumber: 'a',
+            ownerName: 'Nombre corregido',
+            readingTwoMonthsAgo: 0,
+            readingOneMonthAgo: 3,
+            latitude: -30.73,
+            longitude: -70.76,
+            sector: 'Varillar',
+          ),
+          _client('c'),
+        ],
+        isFullExport: false,
+      ),
+    );
+
+    await _openImportFromMenu(tester);
+    await tester.tap(find.text('Elegir archivo'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Plantilla aplicada: 1 actualizados, 1 nuevos. '
+          'Las lecturas del ciclo se conservan.'),
+      findsOneWidget,
+    );
+    final container =
+        ProviderScope.containerOf(tester.element(find.byType(HomeScreen)));
+    final clients = container.read(clientRecordsProvider);
+    final a = clients.firstWhere((c) => c.clientNumber == 'a');
+    expect(a.id, 'a'); // same client, not replaced
+    expect(a.ownerName, 'Nombre corregido');
+    expect(a.sector, 'Varillar');
+    expect(a.hasLocation, isTrue);
+    expect(a.currentReading, 5); // today's reading kept
+    expect(a.isVisited, isTrue);
+    expect(clients.map((c) => c.clientNumber), contains('c'));
+    await _unmount(tester);
+  });
+
+  testWidgets('the menu offers the base template export', (tester) async {
+    await _pumpHome(tester, clients: [_client('a')]);
+
+    await tester.tap(find.byTooltip('Opciones'));
+    await tester.pumpAndSettle();
+    expect(find.text('Exportar Plantilla Base (Solo ubicaciones)'),
+        findsOneWidget);
+    await _unmount(tester);
   });
 }
