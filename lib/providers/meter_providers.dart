@@ -25,22 +25,39 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     state = await _repository.getAllClients();
   }
 
-  /// Save a reading for a specific client
-  Future<void> saveReading(String clientId, int currentReading) async {
+  /// Record the result of a visit: either a [reading] or a
+  /// [nonReadingReason] (exactly one of them), plus optional [observations].
+  /// Saving one clears the other, so a record never holds both.
+  Future<void> saveReading(
+    String clientId, {
+    int? reading,
+    String? nonReadingReason,
+    String? observations,
+  }) async {
+    if ((reading == null) == (nonReadingReason == null)) {
+      throw ArgumentError(
+          'Provide either a reading or a non-reading reason, not both.');
+    }
+
     final client = await _repository.getClient(clientId);
     if (client == null) return;
 
+    final trimmedObservations = observations?.trim();
     final updated = ClientMeterRecord(
       id: client.id,
       clientNumber: client.clientNumber,
       ownerName: client.ownerName,
       readingTwoMonthsAgo: client.readingTwoMonthsAgo,
       readingOneMonthAgo: client.readingOneMonthAgo,
-      currentReading: currentReading,
+      currentReading: reading,
       isVisited: true,
       latitude: client.latitude,
       longitude: client.longitude,
       updatedAt: DateTime.now(),
+      nonReadingReason: nonReadingReason,
+      observations: (trimmedObservations == null || trimmedObservations.isEmpty)
+          ? null
+          : trimmedObservations,
     );
 
     await _repository.saveClient(updated);

@@ -113,6 +113,14 @@ enum NonReadingReason {
 
   const NonReadingReason(this.label);
   final String label;
+
+  /// Parses a stored [label]; returns null for null or unknown values.
+  static NonReadingReason? fromLabel(String? label) {
+    for (final reason in values) {
+      if (reason.label == label) return reason;
+    }
+    return null;
+  }
 }
 
 /// Manual Hive TypeAdapter for ClientMeterRecord (avoids code generation)

@@ -32,6 +32,8 @@ class ExcelExportService {
       'Lectura Hace 1 Mes',
       'Lectura Actual',
       'Consumo M3',
+      'Motivo No Lectura',
+      'Observaciones',
     ];
 
     // Write header row
@@ -51,6 +53,8 @@ class ExcelExportService {
     sheet.setColumnWidth(4, 20);
     sheet.setColumnWidth(5, 16);
     sheet.setColumnWidth(6, 14);
+    sheet.setColumnWidth(7, 20);
+    sheet.setColumnWidth(8, 40);
 
     // Data style
     final dataStyle = CellStyle(
@@ -103,15 +107,32 @@ class ExcelExportService {
         ..value = IntCellValue(record.readingOneMonthAgo)
         ..cellStyle = dataStyle;
 
+      // Visits without a reading leave reading and consumption blank
+      // instead of exporting a misleading 0.
+      final currentReading = record.currentReading;
       sheet
           .cell(CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: row))
-        ..value = IntCellValue(record.currentReading ?? 0)
+        ..value = currentReading != null
+            ? IntCellValue(currentReading)
+            : TextCellValue('-')
         ..cellStyle = dataStyle;
 
       sheet
           .cell(CellIndex.indexByColumnRow(columnIndex: 6, rowIndex: row))
-        ..value = IntCellValue(record.consumptionM3)
+        ..value = currentReading != null
+            ? IntCellValue(record.consumptionM3)
+            : TextCellValue('-')
         ..cellStyle = dataStyle;
+
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 7, rowIndex: row))
+        ..value = TextCellValue(record.nonReadingReason ?? '')
+        ..cellStyle = dataStyle;
+
+      sheet
+          .cell(CellIndex.indexByColumnRow(columnIndex: 8, rowIndex: row))
+        ..value = TextCellValue(record.observations ?? '')
+        ..cellStyle = nameStyle;
     }
 
     // Save to documents directory
