@@ -48,6 +48,12 @@ class ClientMeterRecord {
   /// True when the reader visited the client but could not take a reading.
   bool get hasNonReading => nonReadingReason != null && currentReading == null;
 
+  /// Visit outcome for the current cycle, used to color map pins.
+  VisitStatus get visitStatus {
+    if (!isVisited) return VisitStatus.pending;
+    return currentReading != null ? VisitStatus.read : VisitStatus.noReading;
+  }
+
   /// Returns this record prepared for the next billing cycle.
   ///
   /// With a new reading the history shifts one month back. Without one
@@ -101,6 +107,17 @@ class ClientMeterRecord {
       observations: observations ?? this.observations,
     );
   }
+}
+
+enum VisitStatus {
+  /// Not visited yet this cycle.
+  pending,
+
+  /// Visited and the meter was read.
+  read,
+
+  /// Visited but the meter could not be read (see [NonReadingReason]).
+  noReading,
 }
 
 /// Reasons a meter could not be read. Stored as their [label] in Hive.

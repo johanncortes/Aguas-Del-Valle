@@ -768,7 +768,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
   }
 
   Marker _buildMarker(ClientMeterRecord client) {
-    final isVisited = client.isVisited;
+    final status = client.visitStatus;
     return Marker(
       point: LatLng(client.latitude, client.longitude),
       width: 48,
@@ -784,22 +784,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: isVisited ? AppTheme.visitedGreen : AppTheme.pendingRed,
+                color: status.color,
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 3),
                 boxShadow: [
                   BoxShadow(
-                    color: (isVisited
-                            ? AppTheme.visitedGreen
-                            : AppTheme.pendingRed)
-                        .withValues(alpha: 0.5),
+                    color: status.color.withValues(alpha: 0.5),
                     blurRadius: 8,
                     spreadRadius: 2,
                   ),
                 ],
               ),
               child: Icon(
-                isVisited ? Icons.check : Icons.water_drop,
+                status.pinIcon,
                 color: Colors.white,
                 size: 20,
               ),
@@ -807,9 +804,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
             // Pin tail
             CustomPaint(
               size: const Size(12, 10),
-              painter: _PinTailPainter(
-                color: isVisited ? AppTheme.visitedGreen : AppTheme.pendingRed,
-              ),
+              painter: _PinTailPainter(color: status.color),
             ),
           ],
         ),
@@ -996,32 +991,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: client.isVisited
-                        ? AppTheme.visitedGreen.withValues(alpha: 0.2)
-                        : AppTheme.pendingRed.withValues(alpha: 0.2),
+                    color: client.visitStatus.color.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        client.isVisited
-                            ? Icons.check_circle
-                            : Icons.pending_outlined,
+                        client.visitStatus.badgeIcon,
                         size: 14,
-                        color: client.isVisited
-                            ? AppTheme.visitedGreen
-                            : AppTheme.pendingRed,
+                        color: client.visitStatus.color,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        client.isVisited ? 'Visitado' : 'Pendiente',
+                        client.visitStatus == VisitStatus.noReading
+                            ? 'Sin lectura: ${client.nonReadingReason ?? '-'}'
+                            : client.visitStatus.label,
                         style: GoogleFonts.inter(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: client.isVisited
-                              ? AppTheme.visitedGreen
-                              : AppTheme.pendingRed,
+                          color: client.visitStatus.color,
                         ),
                       ),
                     ],
@@ -1079,9 +1068,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
                   client.isVisited ? Icons.edit : Icons.speed,
                 ),
                 label: Text(
-                  client.isVisited
-                      ? 'Editar Lectura'
-                      : 'Registrar Lectura',
+                  switch (client.visitStatus) {
+                    VisitStatus.pending => 'Registrar Lectura',
+                    VisitStatus.read => 'Editar Lectura',
+                    VisitStatus.noReading => 'Reintentar Lectura',
+                  },
                   style: GoogleFonts.inter(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
@@ -1410,6 +1401,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen>
 }
 
 enum _HeaderMenuAction { closeCycle, reseed }
+
+/// Map pin and badge styling for each visit outcome.
+extension _VisitStatusStyle on VisitStatus {
+  Color get color => switch (this) {
+        VisitStatus.pending => AppTheme.pendingRed,
+        VisitStatus.read => AppTheme.visitedGreen,
+        VisitStatus.noReading => AppTheme.noReadingOrange,
+      };
+
+  IconData get pinIcon => switch (this) {
+        VisitStatus.pending => Icons.water_drop,
+        VisitStatus.read => Icons.check,
+        VisitStatus.noReading => Icons.priority_high,
+      };
+
+  IconData get badgeIcon => switch (this) {
+        VisitStatus.pending => Icons.pending_outlined,
+        VisitStatus.read => Icons.check_circle,
+        VisitStatus.noReading => Icons.report_problem_outlined,
+      };
+
+  String get label => switch (this) {
+        VisitStatus.pending => 'Pendiente',
+        VisitStatus.read => 'Visitado',
+        VisitStatus.noReading => 'Sin lectura',
+      };
+}
 
 /// Custom painter for the triangular pin tail
 class _PinTailPainter extends CustomPainter {

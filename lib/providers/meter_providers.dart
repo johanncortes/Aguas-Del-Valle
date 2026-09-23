@@ -13,6 +13,15 @@ final excelExportServiceProvider = Provider<ExcelExportService>((ref) {
   return ExcelExportService();
 });
 
+/// Thrown when creating a client whose number is already in use.
+class DuplicateClientNumberException implements Exception {
+  final String clientNumber;
+  DuplicateClientNumberException(this.clientNumber);
+
+  @override
+  String toString() => 'Ya existe un cliente con el N° $clientNumber';
+}
+
 /// StateNotifier for managing client records
 class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
   final MeterRepository _repository;
@@ -64,6 +73,14 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     state = await _repository.getAllClients();
   }
 
+  /// Whether [clientNumber] is already used by a client other than
+  /// [exceptClientId] (pass the edited client's id when editing).
+  bool isClientNumberTaken(String clientNumber, {String? exceptClientId}) {
+    final normalized = clientNumber.trim();
+    return state.any((c) =>
+        c.id != exceptClientId && c.clientNumber.trim() == normalized);
+  }
+
   /// Create a new client from a map pin drop
   Future<ClientMeterRecord> addClient({
     required String ownerName,
@@ -74,6 +91,9 @@ class ClientRecordsNotifier extends StateNotifier<List<ClientMeterRecord>> {
     int readingOneMonthAgo = 0,
     int? currentReading,
   }) async {
+    if (isClientNumberTaken(clientNumber)) {
+      throw DuplicateClientNumberException(clientNumber.trim());
+    }
     final record = await _repository.createClient(
       ownerName: ownerName,
       clientNumber: clientNumber,

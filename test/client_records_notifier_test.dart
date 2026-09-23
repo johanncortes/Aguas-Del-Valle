@@ -57,4 +57,36 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  group('client number uniqueness', () {
+    test('detects an existing number, ignoring surrounding spaces', () {
+      expect(notifier.isClientNumberTaken('40225001'), isTrue);
+      expect(notifier.isClientNumberTaken(' 40225001 '), isTrue);
+      expect(notifier.isClientNumberTaken('99999999'), isFalse);
+    });
+
+    test('allows the edited client to keep its own number', () {
+      expect(
+        notifier.isClientNumberTaken('40225001', exceptClientId: 'sp-001'),
+        isFalse,
+      );
+      expect(
+        notifier.isClientNumberTaken('40225001', exceptClientId: 'sp-002'),
+        isTrue,
+      );
+    });
+
+    test('addClient rejects a duplicate number', () async {
+      await expectLater(
+        notifier.addClient(
+          ownerName: 'Duplicado',
+          clientNumber: '40225001',
+          latitude: -30.7,
+          longitude: -70.7,
+        ),
+        throwsA(isA<DuplicateClientNumberException>()),
+      );
+      expect(notifier.state, hasLength(10));
+    });
+  });
 }

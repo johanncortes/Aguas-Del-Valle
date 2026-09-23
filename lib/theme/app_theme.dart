@@ -16,6 +16,7 @@ class AppTheme {
   static const Color errorRed = Color(0xFFEF5350);
   static const Color pendingRed = Color(0xFFE53935);
   static const Color visitedGreen = Color(0xFF43A047);
+  static const Color noReadingOrange = Color(0xFFFB8C00);
 
   static ThemeData get darkTheme {
     return ThemeData(

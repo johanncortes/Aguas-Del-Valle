@@ -87,6 +87,24 @@ void main() {
     });
   });
 
+  group('visitStatus', () {
+    test('pending when not visited', () {
+      expect(_record().visitStatus, VisitStatus.pending);
+    });
+
+    test('read when visited with a reading', () {
+      expect(_record(currentReading: 145, isVisited: true).visitStatus,
+          VisitStatus.read);
+    });
+
+    test('noReading when visited with a non-reading reason', () {
+      expect(
+        _record(isVisited: true, nonReadingReason: 'Perro').visitStatus,
+        VisitStatus.noReading,
+      );
+    });
+  });
+
   group('ClientMeterRecordAdapter', () {
     late Directory dir;
 
