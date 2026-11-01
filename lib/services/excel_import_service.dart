@@ -68,14 +68,15 @@ class ExcelImportService {
   /// Opens the system file picker and parses the chosen file.
   /// Returns null if the user cancels.
   Future<ImportedRoute?> pickAndParse() async {
-    final result = await FilePicker.pickFiles(
+    final file = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['xlsx'],
-      withData: true,
     );
-    if (result == null) return null; // cancelled
-    final bytes = result.files.single.bytes;
-    if (bytes == null) {
+    if (file == null) return null; // cancelled
+    final List<int> bytes;
+    try {
+      bytes = await file.readAsBytes();
+    } catch (_) {
       throw ExcelImportException('No se pudo leer el archivo seleccionado.');
     }
     return parseRoute(bytes);

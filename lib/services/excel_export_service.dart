@@ -187,10 +187,12 @@ class ExcelExportService {
 
   /// Share the generated file via OS native share dialog
   Future<void> shareFile(File file) async {
-    await Share.shareXFiles(
-      [XFile(file.path)],
-      subject: 'Lecturas de Medidores - Monte Patria',
-      text: 'Archivo de lecturas de medidores de agua generado desde Aguas Monte Patria.',
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile(file.path)],
+        subject: 'Lecturas de Medidores - Monte Patria',
+        text: 'Archivo de lecturas de medidores de agua generado desde Aguas Monte Patria.',
+      ),
     );
   }
 }

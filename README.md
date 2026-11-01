@@ -1,21 +1,26 @@
-# aguas_monte_patria
+# Aguas del Valle
 
-Water Meter Reader MVP for Aguas del Valle - Monte Patria
+[![CI](https://github.com/johanncortes/Aguas-Del-Valle/actions/workflows/ci.yml/badge.svg)](https://github.com/johanncortes/Aguas-Del-Valle/actions/workflows/ci.yml)
 
-## Getting Started
+App de lectura de medidores de agua para Aguas del Valle (Monte Patria):
+mapa de clientes, registro de lecturas con foto y GPS, e importación y
+exportación de la ruta en Excel.
 
-This project is a starting point for a Flutter application.
+## Descargar el APK de prueba
 
-A few resources to get you started if this is your first Flutter project:
+Cada cambio en `main` (y cada pull request) ejecuta el workflow **CI**, que
+analiza el código, corre los tests y compila el APK.
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+1. Abra la pestaña **Actions** del repositorio y entre a la última ejecución
+   en verde.
+2. Al final de la página, en **Artifacts**, descargue
+   `aguas-del-valle-apk` (es un `.zip` con `app-release.apk` adentro).
+3. Copie el APK al teléfono Android e instálelo (hay que permitir
+   "instalar apps de origen desconocido").
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
-# Aguas-Del-Valle
+El APK se firma por ahora con la clave de *debug*: sirve para probar en el
+teléfono, pero no para publicar en Play Store. Los artefactos se guardan 30
+días; para generar uno nuevo sin cambios, use **Run workflow** en Actions.
 
 ## Importar la ruta del mes (Excel)
 
