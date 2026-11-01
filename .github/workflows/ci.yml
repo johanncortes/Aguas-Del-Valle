@@ -1,0 +1,57 @@
+# Revisa el código y compila el APK en cada cambio.
+# El APK queda en la pestaña "Actions" → la ejecución → "Artifacts".
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch: # permite ejecutarlo a mano desde la pestaña Actions
+
+# Si llega un push nuevo a la misma rama, cancela la ejecución anterior
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analizar-probar-compilar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Java 17 (lo pide Gradle)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Instalar Flutter (stable; se requiere 3.44 o superior)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Versión de Flutter
+        run: flutter --version
+
+      - name: Descargar dependencias
+        run: flutter pub get
+
+      - name: Analizar el código
+        run: flutter analyze
+
+      - name: Ejecutar tests
+        run: flutter test
+
+      - name: Compilar APK
+        run: flutter build apk --release
+
+      - name: Publicar el APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: aguas-del-valle-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
