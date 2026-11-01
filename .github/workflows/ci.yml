@@ -38,10 +38,7 @@ jobs:
         run: flutter --version
 
       - name: Descargar dependencias
-        run: flutter pub get
-
-      - name: Mostrar pubspec.lock (temporal)
-        run: echo "LOCK-BEGIN"; base64 -w0 pubspec.lock; echo; echo "LOCK-END"
+        run: flutter pub get --enforce-lockfile
 
       - name: Analizar el código
         run: flutter analyze
