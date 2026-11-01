@@ -28,7 +28,7 @@ dependencies:
 
   # File System & Sharing
   path_provider: ^2.1.5
-  share_plus: ^10.1.4
+  share_plus: ^13.3.1
 
   # UI & Fonts
   intl: ^0.20.2
