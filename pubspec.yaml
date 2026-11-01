@@ -36,7 +36,9 @@ dependencies:
   dio_cache_interceptor: ^4.0.7
   uuid: ^4.6.0
   geolocator: ^14.0.2
-  file_picker: ^13.3.1
+  # 13.3.1 pide dbus 0.8 (Linux) y geolocator_linux sigue en 0.7, así que
+  # pub queda en 13.3.0. Versiones <12 no compilan en Android con AGP 9.
+  file_picker: ^13.3.0
   image_picker: ^1.2.3
 
 dev_dependencies:
