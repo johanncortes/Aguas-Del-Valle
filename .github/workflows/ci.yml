@@ -40,6 +40,9 @@ jobs:
       - name: Descargar dependencias
         run: flutter pub get
 
+      - name: Mostrar pubspec.lock (temporal)
+        run: echo "LOCK-BEGIN"; base64 -w0 pubspec.lock; echo; echo "LOCK-END"
+
       - name: Analizar el código
         run: flutter analyze
 
@@ -56,9 +59,3 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 30
 
-      - name: Publicar pubspec.lock resuelto (temporal)
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: pubspec-lock
-          path: pubspec.lock
